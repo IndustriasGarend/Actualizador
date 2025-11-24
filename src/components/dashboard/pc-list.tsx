@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle, Edit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -199,7 +200,11 @@ export function PcList({ initialPcs }: PcListProps) {
                       </DropdownMenu>
                   </div>
                 </div>
-                <CardTitle className="pt-2">{pc.name}</CardTitle>
+                <CardTitle className="pt-2">
+                    <Link href={`/pcs/${pc.id}`} className="hover:underline">
+                        {pc.name}
+                    </Link>
+                </CardTitle>
                 <CardDescription>Última IP: {pc.ip || 'Desconocida'}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-4">

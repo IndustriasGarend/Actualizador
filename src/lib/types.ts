@@ -12,6 +12,12 @@ export interface PC {
   alias: string | null;
   location: string | null;
   loggedUser: string | null;
+  osName: string | null;
+  osVersion: string | null;
+  cpuModel: string | null;
+  cpuCores: number | null;
+  totalMemory: number | null;
+  disks: string | null; // JSON string para simplicidad
 }
 
 export type UpdateStatus = 'pending' | 'running' | 'success' | 'error';
