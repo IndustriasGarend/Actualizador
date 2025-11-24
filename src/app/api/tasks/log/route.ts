@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
-    const { pcId, pcName, action, status, message, versionId } = await request.json();
+    const { pcId, pcName, action, status, message, versionId, taskId } = await request.json();
 
     if (!pcId || !pcName || !action || !status) {
       return NextResponse.json({ message: 'Faltan parámetros requeridos' }, { status: 400 });
@@ -17,22 +17,39 @@ export async function POST(request: Request) {
 
     // Actualizar el estado de la PC
     let pcStatus = 'En progreso';
-    if (action === 'Actualización completada' && status === 'Éxito') {
+    if (status === 'Éxito' && (action === 'Actualización completada' || action === 'Versión ya actualizada')) {
         pcStatus = 'Actualizado';
     } else if (status === 'Fallo') {
         pcStatus = 'Error';
-    } else if (status === 'Omitido') {
-        pcStatus = 'Actualizado';
+    } else if (status === 'Cancelado') {
+        pcStatus = 'Cancelado';
     }
 
     // Solo actualiza la versión si es una actualización exitosa y se proporciona una versionId
     if (pcStatus === 'Actualizado' && versionId) {
-        const pcStmt = db.prepare("UPDATE pcs SET status = ?, lastUpdate = datetime('now'), versionId = ? WHERE id = ?");
+        const pcStmt = db.prepare("UPDATE pcs SET status = ?, lastUpdate = datetime('now'), versionId = ?, currentTaskId = NULL WHERE id = ?");
         pcStmt.run(pcStatus, versionId, pcId);
-    } else {
-        const pcStmt = db.prepare("UPDATE pcs SET status = ? WHERE id = ? AND status != 'Actualizado'");
+    } else if (pcStatus !== 'En progreso') {
+        const pcStmt = db.prepare("UPDATE pcs SET status = ?, currentTaskId = NULL WHERE id = ?");
         pcStmt.run(pcStatus, pcId);
     }
+
+    if(taskId) {
+        let taskStatus = 'en_progreso';
+        if (status === 'Éxito' && (action === 'Actualización completada' || action === 'Versión ya actualizada')) {
+            taskStatus = 'completado';
+        } else if (status === 'Fallo') {
+            taskStatus = 'error';
+        } else if (status === 'Cancelado') {
+            taskStatus = 'cancelado';
+        }
+        
+        if (taskStatus !== 'en_progreso') {
+            const taskStmt = db.prepare("UPDATE tasks SET status = ?, updatedAt = datetime('now') WHERE id = ?");
+            taskStmt.run(taskStatus, taskId);
+        }
+    }
+
 
     return NextResponse.json({ message: 'Log guardado correctamente' });
   } catch (error) {

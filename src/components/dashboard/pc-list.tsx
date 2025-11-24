@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Computer, ServerCrash, GitBranch } from 'lucide-react';
+import { Computer, ServerCrash, GitBranch, Ban } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,9 +39,11 @@ export function PcList({ initialPcs }: PcListProps) {
     setSelectedPc(null);
   };
 
-  const handleUpdateComplete = (pcId: string, status: PC['status']) => {
-    setPcs(pcs.map(p => p.id === pcId ? {...p, status, lastUpdate: new Date().toISOString()} : p));
-    setSelectedPc(null);
+  const handleUpdateComplete = (pcId: string, status: PC['status'], taskId?: number | null) => {
+    setPcs(pcs.map(p => p.id === pcId ? {...p, status, lastUpdate: new Date().toISOString(), currentTaskId: taskId || p.currentTaskId} : p));
+    if (status !== 'En progreso') {
+        setSelectedPc(null);
+    }
   };
 
   if (pcs.length === 0) {
@@ -65,12 +67,15 @@ export function PcList({ initialPcs }: PcListProps) {
                   <Computer className="w-8 h-8 text-muted-foreground" />
                   <Badge variant={
                       pc.status === 'Error' ? 'destructive' : 
+                      pc.status === 'Cancelado' ? 'secondary' :
                       pc.status === 'Pendiente' ? 'secondary' :
                       'default'
                     } className={cn(
                       pc.status === 'Actualizado' && 'bg-accent text-accent-foreground hover:bg-accent/80',
                       pc.status === 'En progreso' && 'bg-primary/80 animate-pulse',
+                      pc.status === 'Cancelado' && 'bg-yellow-500 text-white'
                     )}>
+                      {pc.status === 'Cancelado' && <Ban className="w-3 h-3 mr-1.5" />}
                       {pc.status}
                   </Badge>
                 </div>

@@ -1,4 +1,4 @@
-export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error' | 'Omitido';
+export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error' | 'Omitido' | 'Cancelado';
 
 export interface PC {
   id: string;
@@ -7,6 +7,7 @@ export interface PC {
   status: PCStatus;
   lastUpdate: string | null;
   versionId: string | null;
+  currentTaskId: number | null;
 }
 
 export type UpdateStatus = 'pending' | 'running' | 'success' | 'error';
@@ -23,7 +24,7 @@ export interface LogEntry {
   pcName: string;
   timestamp: string;
   action: string;
-  status: 'Éxito' | 'Fallo' | 'Omitido';
+  status: 'Éxito' | 'Fallo' | 'Omitido' | 'Cancelado';
   message: string;
   versionId?: string | null;
 }
