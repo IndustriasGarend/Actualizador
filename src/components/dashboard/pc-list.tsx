@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Computer, CheckCircle, XCircle, Clock, ServerCrash } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Computer, ServerCrash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,21 @@ import type { PC } from '@/lib/types';
 import { pcs as initialPcs } from '@/lib/data';
 import { UpdateModal } from './update-modal';
 import { cn } from '@/lib/utils';
+
+function ClientFormattedDate({ dateString }: { dateString: string | null }) {
+  const [formattedDate, setFormattedDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dateString) {
+      setFormattedDate(new Date(dateString).toLocaleString('es-ES'));
+    } else {
+      setFormattedDate('Nunca');
+    }
+  }, [dateString]);
+
+  return <>{formattedDate || <span className="opacity-50">Cargando...</span>}</>;
+}
+
 
 export function PcList() {
   const [pcs, setPcs] = useState<PC[]>(initialPcs);
@@ -63,7 +78,9 @@ export function PcList() {
               <CardContent className="flex-grow">
                 <div className="text-sm text-muted-foreground">
                   <p>Última actualización:</p>
-                  <p className="font-medium text-foreground/80">{pc.lastUpdate ? new Date(pc.lastUpdate).toLocaleString('es-ES') : 'Nunca'}</p>
+                  <p className="font-medium text-foreground/80">
+                    <ClientFormattedDate dateString={pc.lastUpdate} />
+                  </p>
                 </div>
               </CardContent>
               <CardFooter>

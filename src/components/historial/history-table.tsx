@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useState } from 'react';
 
 import {
   Table,
@@ -16,6 +17,19 @@ import { FileText } from 'lucide-react';
 interface HistoryTableProps {
   logs: LogEntry[];
 }
+
+function ClientFormattedDate({ dateString }: { dateString: string | null }) {
+  const [formattedDate, setFormattedDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dateString) {
+      setFormattedDate(new Date(dateString).toLocaleString('es-ES'));
+    }
+  }, [dateString]);
+
+  return <>{formattedDate || dateString}</>;
+}
+
 
 export function HistoryTable({ logs }: HistoryTableProps) {
 
@@ -51,7 +65,9 @@ export function HistoryTable({ logs }: HistoryTableProps) {
                 {logs.map((log) => (
                 <TableRow key={log.id}>
                     <TableCell className="font-medium">{log.pcName}</TableCell>
-                    <TableCell>{new Date(log.timestamp).toLocaleString('es-ES')}</TableCell>
+                    <TableCell>
+                      <ClientFormattedDate dateString={log.timestamp} />
+                    </TableCell>
                     <TableCell>{log.action}</TableCell>
                     <TableCell>
                     <Badge variant={log.status === 'Éxito' ? 'default' : 'destructive'} className={log.status === 'Éxito' ? 'bg-accent hover:bg-accent/90' : ''}>
