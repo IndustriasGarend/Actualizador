@@ -7,17 +7,27 @@ import { db } from '@/lib/db';
 import type { SystemConfig } from '@/lib/types';
 
 function getSystemConfig(): SystemConfig {
-  const stmt = db.prepare('SELECT * FROM settings');
+  const stmt = db.prepare('SELECT key, value FROM settings');
   const rows = stmt.all() as { key: string; value: string }[];
   
-  const config = rows.reduce((acc, row) => {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+  // Convertir el array de filas en un objeto para fácil acceso
+  const settingsMap = rows.reduce((acc, row) => {
     acc[row.key] = row.value;
     return acc;
-  }, {} as Partial<SystemConfig>);
+  }, {} as Record<string, string>);
 
-  return { ...defaultConfig, ...config };
+  // Construir el objeto de configuración, usando los valores de la DB o los por defecto
+  const config: SystemConfig = {
+    updateFilePath: settingsMap.updateFilePath || defaultConfig.updateFilePath,
+    localUpdateDir: settingsMap.localUpdateDir || defaultConfig.localUpdateDir,
+    softlandInstallDir: settingsMap.softlandInstallDir || defaultConfig.softlandInstallDir,
+    serviceName: settingsMap.serviceName || defaultConfig.serviceName,
+    adminUser: settingsMap.adminUser || defaultConfig.adminUser,
+    environmentPath: settingsMap.environmentPath || defaultConfig.environmentPath,
+    adminPass: '', // La contraseña nunca se carga, siempre está vacía en el formulario
+  };
+
+  return config;
 }
 
 
