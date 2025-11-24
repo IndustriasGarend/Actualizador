@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
-    const { pcId, pcName, action, status, message, versionId, taskId } = await request.json();
+    const { pcId, pcName, action, status, message, versionId, taskId, agentVersion } = await request.json();
 
     if (!pcId || !pcName || !action || !status) {
       return NextResponse.json({ message: 'Faltan parámetros requeridos' }, { status: 400 });
@@ -25,14 +25,30 @@ export async function POST(request: Request) {
         pcStatus = 'Cancelado';
     }
 
-    // Solo actualiza la versión si es una actualización exitosa y se proporciona una versionId
+    // Construir la consulta de actualización dinámicamente
+    let updateQuery = "UPDATE pcs SET status = ?, lastUpdate = datetime('now')";
+    const params = [pcStatus];
+
     if (pcStatus === 'Actualizado' && versionId) {
-        const pcStmt = db.prepare("UPDATE pcs SET status = ?, lastUpdate = datetime('now'), versionId = ?, currentTaskId = NULL WHERE id = ?");
-        pcStmt.run(pcStatus, versionId, pcId);
-    } else if (pcStatus !== 'En progreso') {
-        const pcStmt = db.prepare("UPDATE pcs SET status = ?, currentTaskId = NULL WHERE id = ?");
-        pcStmt.run(pcStatus, pcId);
+        updateQuery += ", versionId = ?";
+        params.push(versionId);
     }
+    if (agentVersion) {
+        updateQuery += ", agentVersion = ?";
+        params.push(agentVersion);
+    }
+
+    // Si el estado final no es 'En progreso', limpiamos la tarea actual.
+    if (pcStatus !== 'En progreso') {
+        updateQuery += ", currentTaskId = NULL";
+    }
+    
+    updateQuery += " WHERE id = ?";
+    params.push(pcId);
+    
+    const pcStmt = db.prepare(updateQuery);
+    pcStmt.run(...params);
+
 
     if(taskId) {
         let taskStatus = 'en_progreso';

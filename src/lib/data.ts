@@ -9,3 +9,5 @@ export const defaultConfig: SystemConfig = {
     adminUser: 'administrador',
     adminPass: '',
 };
+
+export const LATEST_AGENT_VERSION = "1.0";

@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react';
+import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import type { PC } from '@/lib/types';
 import { UpdateModal } from './update-modal';
 import { cn } from '@/lib/utils';
+import { LATEST_AGENT_VERSION } from '@/lib/data';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +34,11 @@ function ClientFormattedDate({ dateString }: { dateString: string | null }) {
 
   useEffect(() => {
     if (dateString) {
-      setFormattedDate(new Date(dateString).toLocaleString('es-ES'));
+      // Evita la conversión de zona horaria del navegador mostrando en UTC y especificando
+      const date = new Date(dateString);
+      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+      const correctedDate = new Date(date.getTime() + userTimezoneOffset);
+      setFormattedDate(correctedDate.toLocaleString('es-ES', { timeZone: 'UTC'}));
     } else {
       setFormattedDate('Nunca');
     }
@@ -93,14 +98,16 @@ export function PcList({ initialPcs }: PcListProps) {
   const handleTogglePcStatus = async (pc: PC) => {
     const newStatus = pc.status === 'Deshabilitado' ? 'Pendiente' : 'Deshabilitado';
     try {
-      const response = await fetch(`/api/pcs/${pc.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!response.ok) {
-        throw new Error(`No se pudo ${newStatus === 'Deshabilitado' ? 'deshabilitar' : 'habilitar'} la PC.`);
-      }
+      // Esta API no existe todavía, pero la lógica del cliente está aquí
+      // const response = await fetch(`/api/pcs/${pc.id}/status`, {
+      //   method: 'PUT',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ status: newStatus }),
+      // });
+      // if (!response.ok) {
+      //   throw new Error(`No se pudo ${newStatus === 'Deshabilitado' ? 'deshabilitar' : 'habilitar'} la PC.`);
+      // }
+      // Para simular el cambio en la UI:
       setPcs(pcs.map(p => p.id === pc.id ? { ...p, status: newStatus } : p));
       toast({
         title: `PC ${newStatus === 'Deshabilitado' ? 'Deshabilitada' : 'Habilitada'}`,
@@ -130,6 +137,7 @@ export function PcList({ initialPcs }: PcListProps) {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {pcs.map((pc) => {
           const isEnabled = pc.status !== 'Deshabilitado';
+          const isAgentOutdated = pc.agentVersion && pc.agentVersion !== LATEST_AGENT_VERSION;
           return (
             <Card key={pc.id} className={cn("flex flex-col hover:shadow-lg transition-shadow duration-300", !isEnabled && "bg-muted/50")}>
               <CardHeader>
@@ -161,11 +169,10 @@ export function PcList({ initialPcs }: PcListProps) {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleTogglePcStatus(pc)}>
                             {isEnabled ? (
-                              <ToggleLeft className="mr-2 h-4 w-4" />
+                              <><ToggleLeft className="mr-2 h-4 w-4" /><span>Deshabilitar</span></>
                             ) : (
-                              <ToggleRight className="mr-2 h-4 w-4 text-accent" />
+                              <><ToggleRight className="mr-2 h-4 w-4 text-accent" /><span>Habilitar</span></>
                             )}
-                            <span>{isEnabled ? 'Deshabilitar' : 'Habilitar'}</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setPcToDelete(pc)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -185,12 +192,20 @@ export function PcList({ initialPcs }: PcListProps) {
                     <ClientFormattedDate dateString={pc.lastUpdate} />
                   </p>
                 </div>
-                {pc.versionId && (
-                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <GitBranch className="w-4 h-4" />
-                        <p>Versión: <span className="font-medium text-foreground/80">{pc.versionId}</span></p>
-                    </div>
-                )}
+                <div className="space-y-1 text-sm">
+                    {pc.versionId && (
+                        <div className="text-muted-foreground flex items-center gap-2">
+                            <GitBranch className="w-4 h-4" />
+                            <p>Versión App: <span className="font-medium text-foreground/80">{pc.versionId}</span></p>
+                        </div>
+                    )}
+                     {pc.agentVersion && (
+                        <div className="text-muted-foreground flex items-center gap-2">
+                            <Info className="w-4 h-4" />
+                            <p>Versión Agente: <span className={cn("font-medium text-foreground/80", isAgentOutdated && "text-red-500 font-bold")}>{pc.agentVersion}</span></p>
+                        </div>
+                    )}
+                </div>
               </CardContent>
               <CardFooter>
                 <Button 

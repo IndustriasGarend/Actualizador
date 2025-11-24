@@ -8,6 +8,7 @@ export interface PC {
   lastUpdate: string | null;
   versionId: string | null;
   currentTaskId: number | null;
+  agentVersion: string | null;
 }
 
 export type UpdateStatus = 'pending' | 'running' | 'success' | 'error';

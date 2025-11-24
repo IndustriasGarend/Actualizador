@@ -1,0 +1,190 @@
+# Softland Updater Agent
+# Versión: 1.0
+
+# --- Parámetros (inyectados por el servidor) ---
+$ServerUrl = "__SERVER_URL__"
+$PcId = "__PC_ID__"
+
+# --- Constantes ---
+$AgentVersion = "1.0"
+$LogTag = "SoftlandUpdaterAgent"
+$MaxRetryCount = 3
+$RetryDelaySeconds = 10
+
+# --- Funciones ---
+
+# Función para enviar logs al servidor
+function Send-Log {
+    param (
+        [string]$Action,
+        [string]$Status,
+        [string]$Message = "",
+        [string]$VersionId = $null,
+        [string]$TaskId = $null
+    )
+
+    $pcName = $env:COMPUTERNAME
+    $body = @{
+        pcId         = $PcId
+        pcName       = $pcName
+        action       = $Action
+        status       = $Status
+        message      = $Message
+        versionId    = $VersionId
+        taskId       = $TaskId
+        agentVersion = $AgentVersion
+    } | ConvertTo-Json
+
+    try {
+        Write-Host "Enviando log: $body"
+        Invoke-RestMethod -Uri "$ServerUrl/api/tasks/log" -Method Post -Body $body -ContentType 'application/json' -UseBasicParsing
+    }
+    catch {
+        Write-Error "No se pudo enviar el log al servidor: $($_.Exception.Message)"
+    }
+}
+
+# Función para chequear si la tarea fue cancelada
+function Check-For-Cancel {
+    param ([string]$TaskId)
+    
+    if (-not $TaskId) { return $false }
+
+    try {
+        $response = Invoke-RestMethod -Uri "$ServerUrl/api/tasks/check/$PcId" -Method Get -UseBasicParsing
+        if ($response.task -eq 'cancelar' -and $response.taskId -eq $TaskId) {
+            Send-Log -Action "Proceso de actualización cancelado por el usuario" -Status "Cancelado" -TaskId $TaskId
+            return $true
+        }
+    }
+    catch {
+        # No se pudo contactar al servidor, se asume que no hay cancelación y se continúa.
+        Write-Warning "No se pudo verificar el estado de cancelación: $($_.Exception.Message)"
+    }
+    return $false
+}
+
+
+# --- Lógica Principal del Agente ---
+
+function Run-Update-Process {
+    param (
+        [string]$TaskId,
+        [hashtable]$Config
+    )
+
+    $ErrorActionPreference = "Stop"
+    $updateFilePath = $Config.updateFilePath
+    $localUpdateDir = $Config.localUpdateDir
+    $softlandInstallDir = $Config.softlandInstallDir
+    $serviceNames = $Config.serviceName -split ',' | ForEach-Object { $_.Trim() }
+
+
+    try {
+        # --- 1. Verificar versión actual ---
+        Send-Log -Action "Verificando versión" -Status "Éxito" -Message "Comparando versión local con la del servidor" -TaskId $TaskId
+        
+        $serverVersionPath = Join-Path (Split-Path -Path $updateFilePath -Parent) "version.txt"
+        $localVersionPath = Join-Path $softlandInstallDir "version.txt"
+
+        if (-not (Test-Path $serverVersionPath)) {
+            throw "El archivo 'version.txt' no se encuentra en la ruta del servidor."
+        }
+        $serverVersion = Get-Content $serverVersionPath -Raw
+        $localVersion = if (Test-Path $localVersionPath) { Get-Content $localVersionPath -Raw } else { "ninguna" }
+
+        if ($serverVersion -eq $localVersion) {
+            Send-Log -Action "Versión ya actualizada" -Status "Omitido" -Message "La PC ya tiene la versión $localVersion." -VersionId $localVersion -TaskId $TaskId
+            return
+        }
+
+        # --- Cancel Check ---
+        if (Check-For-Cancel -TaskId $TaskId) { return }
+
+        # --- 2. Detener servicios ---
+        foreach ($serviceName in $serviceNames) {
+            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+                Send-Log -Action "Deteniendo servicio '$serviceName'" -Status "Éxito" -TaskId $TaskId
+                Stop-Service -Name $serviceName -Force
+            }
+        }
+
+        # --- Cancel Check ---
+        if (Check-For-Cancel -TaskId $TaskId) { return }
+
+        # --- 3. Crear directorio temporal ---
+        if (-not (Test-Path $localUpdateDir)) {
+            New-Item -Path $localUpdateDir -ItemType Directory | Out-Null
+        }
+        
+        # --- 4. Copiar archivo de actualización ---
+        Send-Log -Action "Copiando archivo de actualización" -Status "Éxito" -TaskId $TaskId
+        Copy-Item -Path $updateFilePath -Destination $localUpdateDir -Force
+        $localUpdateFile = Join-Path $localUpdateDir (Split-Path -Path $updateFilePath -Leaf)
+        
+        # --- Cancel Check ---
+        if (Check-For-Cancel -TaskId $TaskId) { return }
+
+        # --- 5. Extraer archivos ---
+        Send-Log -Action "Extrayendo archivos" -Status "Éxito" -TaskId $TaskId
+        # Asumiendo que 7-Zip está en el PATH del sistema
+        & "C:\Program Files\7-Zip\7z.exe" x $localUpdateFile -o"$softlandInstallDir" -y | Out-Null
+
+        # --- Cancel Check ---
+        if (Check-For-Cancel -TaskId $TaskId) { return }
+
+        # --- 6. Copiar nueva versión ---
+        Set-Content -Path $localVersionPath -Value $serverVersion
+        
+        # --- 7. Limpiar ---
+        Remove-Item -Path $localUpdateDir -Recurse -Force
+
+        Send-Log -Action "Actualización completada" -Status "Éxito" -Message "La PC ha sido actualizada a la versión $serverVersion." -VersionId $serverVersion -TaskId $TaskId
+
+    }
+    catch {
+        $errorMessage = "Error en la acción '$($_.InvocationInfo.MyCommand)': $($_.Exception.Message)"
+        Send-Log -Action "$($_.InvocationInfo.MyCommand)" -Status "Fallo" -Message $errorMessage -TaskId $TaskId
+    }
+    finally {
+        # --- 8. Reiniciar servicios (siempre intentar) ---
+        $ErrorActionPreference = "SilentlyContinue"
+        foreach ($serviceName in $serviceNames) {
+            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+                Send-Log -Action "Iniciando servicio '$serviceName'" -Status "Éxito" -TaskId $TaskId
+                Start-Service -Name $serviceName
+            }
+        }
+    }
+}
+
+
+# --- Ciclo Infinito de Verificación ---
+
+while ($true) {
+    try {
+        # El agente consulta al servidor si hay una tarea para él
+        $response = Invoke-RestMethod -Uri "$ServerUrl/api/tasks/check/$PcId" -Method Get -UseBasicParsing
+
+        if ($response.task -eq 'actualizar') {
+            # El servidor nos dio una tarea de actualización
+            $taskId = $response.taskId
+            $taskConfig = $response.config # El servidor ahora envía la configuración junto con la tarea
+            
+            Send-Log -Action "Inicio de actualización" -Status "Éxito" -Message "Recibida tarea de actualización del servidor" -TaskId $taskId
+            
+            Run-Update-Process -TaskId $taskId -Config $taskConfig
+        }
+        else {
+            # No hay tareas, solo reportar que está vivo (opcional, para mantener IP actualizada)
+             Send-Log -Action "Heartbeat" -Status "Éxito" -Message "El agente está activo."
+        }
+    }
+    catch {
+        # No se pudo contactar con el servidor. Se reintentará en el próximo ciclo.
+        Write-Warning "No se pudo conectar al servidor: $($_.Exception.Message)"
+    }
+    
+    # Esperar 60 segundos antes de la próxima verificación
+    Start-Sleep -Seconds 60
+}
