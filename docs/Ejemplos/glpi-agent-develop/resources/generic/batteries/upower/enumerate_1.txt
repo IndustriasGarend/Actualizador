@@ -1,4 +1,0 @@
-/org/freedesktop/UPower/devices/line_power_ADP1
-/org/freedesktop/UPower/devices/battery_BAT1
-/org/freedesktop/UPower/devices/mouse_0003o046Do1017x0006
-/org/freedesktop/UPower/devices/DisplayDevice

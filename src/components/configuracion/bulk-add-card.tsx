@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Loader2, FileUp } from 'lucide-react';
+import { Upload, Loader2, FileUp, HelpCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export function BulkAddCard() {
   const [isLoading, setIsLoading] = useState(false);
@@ -71,6 +72,16 @@ export function BulkAddCard() {
         <CardTitle className="flex items-center gap-2">
             <FileUp className="w-6 h-6" />
             Adición Masiva de PCs
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <HelpCircle className="h-5 w-5 ml-1 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p className="max-w-xs">Permite registrar múltiples PCs en el sistema de una sola vez, para no tener que hacerlo una por una.</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </CardTitle>
         <CardDescription>
           Añada múltiples PCs al sistema subiendo un archivo CSV. El archivo debe tener hasta 4 columnas: 

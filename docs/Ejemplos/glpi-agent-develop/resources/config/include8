@@ -1,4 +1,0 @@
-logfile = /tmp/logfile.txt
-tag = include8
-
-include conf.d/empty-logfile

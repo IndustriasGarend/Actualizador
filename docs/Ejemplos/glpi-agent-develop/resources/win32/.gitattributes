@@ -1,3 +1,0 @@
-# prevent any eol normalization
-*.reg -text
-*.wmi -text

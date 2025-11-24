@@ -1,2 +1,0 @@
-exclude   = ProhibitAccessOfPrivateData ProhibitThreeArgumentOpen
-include   = ClassHierarchies ProhibitCommaSeparatedStatements ProhibitMultiplePackages

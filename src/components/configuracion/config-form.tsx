@@ -17,8 +17,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import type { SystemConfig } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const formSchema = z.object({
   updateFilePath: z.string().min(1, 'La ruta del archivo es requerida.'),
@@ -32,6 +33,20 @@ const formSchema = z.object({
 interface ConfigFormProps {
   initialConfig: SystemConfig;
 }
+
+const HelpTooltip = ({ children }: { children: React.ReactNode }) => (
+    <TooltipProvider>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 ml-1.5 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>
+                <p className="max-w-xs">{children}</p>
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
+);
+
 
 export function ConfigForm({ initialConfig }: ConfigFormProps) {
   const [isSaving, setIsSaving] = useState(false);
@@ -80,7 +95,12 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="updateFilePath"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Ruta de archivo de actualización</FormLabel>
+                    <FormLabel className="flex items-center">
+                        Ruta de archivo de actualización
+                        <HelpTooltip>
+                            Ruta de red completa (UNC Path) al archivo comprimido (.7z, .zip, etc.) que contiene la actualización de Softland. El agente debe tener permisos de lectura a esta ruta. Ej: \\\\servidor\\updates\\update.7z
+                        </HelpTooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input placeholder="\\\\servidor\\updates\\update.7z" {...field} />
                     </FormControl>
@@ -94,7 +114,12 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="localUpdateDir"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Directorio de actualización local</FormLabel>
+                     <FormLabel className="flex items-center">
+                        Directorio de actualización local
+                        <HelpTooltip>
+                            Carpeta temporal en la PC cliente donde se extraerán los archivos de actualización antes de copiarlos a su destino final. Ej: C:\\Actualizacion
+                        </HelpTooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input placeholder="C:\\Actualizacion" {...field} />
                     </FormControl>
@@ -108,7 +133,12 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="softlandInstallDir"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Directorio de instalación de Softland</FormLabel>
+                     <FormLabel className="flex items-center">
+                        Directorio de instalación de Softland
+                        <HelpTooltip>
+                            Ruta local en la PC cliente donde está instalado Softland. Es la carpeta donde se sobrescribirán los archivos. Ej: C:\\SoftlandERP
+                        </HelpTooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input placeholder="C:\\SoftlandERP" {...field} />
                     </FormControl>
@@ -122,7 +152,12 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="serviceName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombres de los servicios</FormLabel>
+                     <FormLabel className="flex items-center">
+                        Nombres de los servicios
+                        <HelpTooltip>
+                            Lista de servicios de Windows que deben ser detenidos antes de la actualización para liberar archivos. Si son varios, sepáralos por comas. Ej: Servicio1,Servicio POS
+                        </HelpTooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input placeholder="Servicio1,Servicio2" {...field} />
                     </FormControl>
@@ -138,7 +173,12 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="adminUser"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Usuario Administrador</FormLabel>
+                    <FormLabel className="flex items-center">
+                        Usuario Administrador
+                        <HelpTooltip>
+                           La cuenta con la que se ejecutará el servicio del agente en cada PC. Debe tener permisos de administrador local y acceso a la ruta de red del archivo de actualización. El formato debe ser DOMINIO\\usuario.
+                        </HelpTooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input placeholder="DOMINIO\\usuario" {...field} />
                     </FormControl>
@@ -152,7 +192,12 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="adminPass"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contraseña de Administrador</FormLabel>
+                    <FormLabel className="flex items-center">
+                        Contraseña de Administrador
+                        <HelpTooltip>
+                            La contraseña de la cuenta de servicio. No se guarda en el servidor. El script de instalación la solicitará de forma segura en la PC cliente para configurar el servicio de Windows.
+                        </HelpTooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>

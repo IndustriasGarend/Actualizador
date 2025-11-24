@@ -1,2 +1,0 @@
-# Skip as GLPI::Agent is not installed system-wide
-use.t

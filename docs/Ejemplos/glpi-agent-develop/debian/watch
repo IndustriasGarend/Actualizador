@@ -1,3 +1,0 @@
-version=4
-pts=filenamemangle=s/.+\/v?(\d\S+)\.tar\.gz/<project>-$1\.tar\.gz/ \
-  https://github.com/glpi-project/glpi-agent/tags .*/v?(\d\S+)\.tar\.gz

@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, HardDriveDownload, Loader2 } from 'lucide-react';
+import { Download, HardDriveDownload, HelpCircle, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export function DownloadAgentCard() {
   const [isLoading, setIsLoading] = useState(false);
@@ -73,6 +74,16 @@ export function DownloadAgentCard() {
         <CardTitle className="flex items-center gap-2">
             <HardDriveDownload className="w-6 h-6" />
             Descargar Agente
+             <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <HelpCircle className="h-5 w-5 ml-1 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p className="max-w-xs">Genera el paquete de instalación (.zip) para una nueva PC individual. Este paquete contiene los scripts necesarios para instalar el servicio del agente.</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </CardTitle>
         <CardDescription>
           Genere y descargue el paquete de instalación del agente para una nueva PC cliente.
