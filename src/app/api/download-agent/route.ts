@@ -4,6 +4,14 @@ import path from 'path';
 import JSZip from 'jszip';
 import { db } from '@/lib/db';
 
+// Helper para crear un buffer con BOM (Byte Order Mark) para UTF-8
+function getUtf8BomBuffer(content: string): Buffer {
+    // BOM for UTF-8 is EF BB BF
+    const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
+    const bufferContent = Buffer.from(content, 'utf-8');
+    return Buffer.concat([bom, bufferContent]);
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const pcId = searchParams.get('pcId');
@@ -39,21 +47,22 @@ export async function GET(request: Request) {
         
         // Crear el archivo ZIP en memoria
         const zip = new JSZip();
-        zip.file('agent.ps1', agentScriptContent);
-        zip.file('install-service.ps1', installScriptContent);
+        // Guardar scripts de PS con codificacion UTF-8 con BOM
+        zip.file('agent.ps1', getUtf8BomBuffer(agentScriptContent));
+        zip.file('install-service.ps1', getUtf8BomBuffer(installScriptContent));
         zip.file('install.bat', installBatContent);
         
-        // Incluir 7za.exe en el zip para que esté disponible para el agente
+        // Incluir 7za.exe en el zip para que este disponible para el agente
         const sevenZipPath = path.join(process.cwd(), 'scripts', '7za.exe');
         const sevenZipBuffer = await fs.readFile(sevenZipPath);
-        zip.file('7za.exe', sevenZipBuffer);
+        zip.file('7za.exe', sevenZipBuffer, { binary: true });
 
 
         let zipFilename = `softland-agent-update.zip`;
 
         if (!forUpdate) {
             zipFilename = `softland-agent-${pcName}.zip`;
-            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la contraseña para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName}' será creado e iniciado.`);
+            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la cuenta y contrasena para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName}' sera creado e iniciado.`);
             
             // Insertar la PC en la base de datos si no existe
             const stmt = db.prepare('INSERT OR IGNORE INTO pcs (id, name, alias, location, ip, status) VALUES (?, ?, ?, ?, ?, ?)');
@@ -61,7 +70,7 @@ export async function GET(request: Request) {
         }
 
 
-        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+        const zipContent = await zip.generateAsync({ type: 'nodebuffer', platform: 'DOS' });
 
         // Devolver el ZIP para descarga
         return new NextResponse(zipContent, {

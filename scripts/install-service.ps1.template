@@ -1,60 +1,71 @@
-#Requires -RunAsAdministrator
+# Script para instalar el servicio del agente de Softland Updater
 
-# --- Parámetros ---
-$ServiceName = "SoftlandUpdateAgent___PC_NAME__"
+# --- Variables ---
+$ServiceName = "SoftlandUpdateAgent_$(__PC_NAME__.replace('-', ''))"
 $ServiceDisplayName = "Softland Updater Agent (__PC_NAME__)"
-$ServiceDescription = "Servicio agente para el panel de actualizaciones de Softland. PC: __PC_NAME__."
+$ScriptPath = Join-Path $PSScriptRoot "agent.ps1"
+$PowerShellPath = (Get-Command powershell.exe).Path
+$exePath = """$PowerShellPath"" -ExecutionPolicy Bypass -NoProfile -File ""$ScriptPath"""
 
-# --- Lógica de Instalación ---
+# --- Logica de Instalacion/Actualizacion ---
+Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
+
+# 1. Verificar si el servicio ya existe y desinstalarlo (para actualizaciones)
+$existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+if ($null -ne $existingService) {
+    Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
+    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    # Esperar un poco para que el servicio se detenga completamente
+    Start-Sleep -Seconds 5 
+    
+    try {
+        $serviceConfig = Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'"
+        if ($serviceConfig) {
+            $serviceConfig.Delete()
+            Write-Host "Servicio anterior '$ServiceName' desinstalado."
+        }
+    } catch {
+        Write-Host "Advertencia: No se pudo eliminar el servicio anterior automaticamente: $($_.Exception.Message)"
+        Write-Host "Puede que necesite eliminarlo manualmente con 'sc.exe delete $ServiceName' desde un CMD como Administrador."
+    }
+    Start-Sleep -Seconds 2
+}
+
+# 2. Solicitar credenciales
+# Para ejecucion no interactiva (actualizacion automatica)
+if ($noninteractive) {
+    # No se piden credenciales, se asume que el proceso padre tiene los permisos
+    Write-Host "Ejecucion no interactiva. El servicio se creara con la cuenta LocalSystem."
+    $credential = $null
+} else {
+    # Ejecucion interactiva (instalacion manual)
+    $cred_message = New-Object System.Management.Automation.Host.FieldDescription "Usuario (formato: DOMINIO\usuario)"
+    $cred_message.HelpMessage = "Ingrese la cuenta de servicio con permisos de administrador local."
+    $pass_message = New-Object System.Management.Automation.Host.FieldDescription "Contrasena"
+    $pass_message.HelpMessage = "Ingrese la contrasena para la cuenta de servicio."
+    
+    $credential = $host.ui.PromptForCredential("Credenciales para el Servicio", "Por favor, ingrese la cuenta y contrasena con la que se ejecutara el servicio del agente.", "", "Target", $cred_message, $pass_message)
+}
+
+
+# 3. Crear el nuevo servicio
+Write-Host "Creando el nuevo servicio '$ServiceName'..."
 try {
-    # 1. Determinar la ruta del script del agente
-    # La ruta del script que está ejecutándose ($MyInvocation.MyCommand.Path)
-    # y el agente (agent.ps1) deben estar en el mismo directorio.
-    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $AgentScriptPath = Join-Path $ScriptDir "agent.ps1"
-
-    if (-not (Test-Path $AgentScriptPath)) {
-        throw "No se encontró el script 'agent.ps1' en la carpeta '$ScriptDir'."
+    $serviceParams = @{
+        Name = $ServiceName
+        BinaryPathName = $exePath
+        DisplayName = $ServiceDisplayName
+        Description = "Agente de actualizacion para Softland ERP. Se comunica con el servidor central para ejecutar tareas."
+        StartupType = "Automatic"
+    }
+    if ($credential) {
+        $serviceParams.Credential = $credential
     }
 
-    # 2. Desinstalar cualquier versión antigua del servicio
-    # Esto es clave para las auto-actualizaciones.
-    $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    if ($existingService) {
-        Write-Host "Servicio antiguo encontrado. Deteniendo y eliminando '$ServiceName'..."
-        try {
-            Stop-Service -Name $ServiceName -Force
-        } catch {
-            Write-Warning "No se pudo detener el servicio (puede que ya estuviera detenido)."
-        }
-        # Espera un poco para asegurar que el servicio se detenga completamente
-        Start-Sleep -Seconds 3
-        
-        $serviceObject = Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'"
-        if ($serviceObject) {
-            $serviceObject.Delete()
-            Write-Host "Servicio '$ServiceName' eliminado."
-        }
-        Start-Sleep -Seconds 2
-    }
+    New-Service @serviceParams
 
-
-    # 3. Pedir credenciales de forma segura para ejecutar el servicio
-    # Estas credenciales deben tener permisos de administrador local
-    # y acceso a los recursos de red (ruta del archivo de actualización).
-    $credential = Get-Credential
-
-    # 4. Crear el nuevo servicio
-    Write-Host "Creando el nuevo servicio '$ServiceName'..."
-    New-Service -Name $ServiceName `
-                -BinaryPathName "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$AgentScriptPath`"" `
-                -DisplayName $ServiceDisplayName `
-                -Description $ServiceDescription `
-                -StartupType Automatic `
-                -Credential $credential
-
-    Write-Host "Configurando recuperación del servicio..."
-    # Configurar el servicio para que se reinicie automáticamente si falla
+    # 4. Configurar recuperacion en caso de fallo
+    Write-Host "Configurando recuperacion del servicio..."
     sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/120000
 
     # 5. Iniciar el servicio
@@ -63,19 +74,16 @@ try {
 
     Write-Host ""
     Write-Host "--------------------------------------------------------"
-    Write-Host "¡Instalación completada!"
-    Write-Host "El servicio '$ServiceDisplayName' se ha instalado y está en ejecución."
-    Write-Host "Se ejecutará automáticamente cuando el equipo se inicie."
+    Write-Host "Instalacion completada!"
+    Write-Host "El servicio '$ServiceDisplayName' se ha instalado y esta en ejecucion."
+    Write-Host "Se ejecutara automaticamente cuando el equipo se inicie."
     Write-Host "--------------------------------------------------------"
 
 } catch {
-    Write-Error "Ocurrió un error durante la instalación: $($_.Exception.Message)"
-    # Pausa para que el usuario pueda ver el error
-    Read-Host "Presione Enter para salir"
-    exit 1
+    Write-Error "Ocurrio un error critico durante la creacion del servicio: $($_.Exception.Message)"
+    Write-Host "Verifique que las credenciales son correctas y que esta ejecutando el script como Administrador."
 }
 
-# Pausa final en caso de éxito para que el usuario vea el resultado
-Read-Host "Presione Enter para cerrar esta ventana"
-
-    
+if (-not $noninteractive) {
+    Read-Host "Presione Enter para cerrar esta ventana"
+}
