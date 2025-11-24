@@ -34,7 +34,7 @@ export async function POST(request: Request) {
         for (const [key, value] of Object.entries(cfg)) {
             // Solo guardar si el valor no es undefined
             if (value !== undefined) {
-                stmt.run(key, value);
+                stmt.run(key, String(value));
             }
         }
     });

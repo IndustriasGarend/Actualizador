@@ -15,7 +15,7 @@ function getSystemConfig(): SystemConfig {
     // @ts-ignore
     acc[row.key] = row.value;
     return acc;
-  }, {});
+  }, {} as Partial<SystemConfig>);
 
   return { ...defaultConfig, ...config };
 }
