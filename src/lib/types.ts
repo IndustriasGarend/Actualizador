@@ -1,4 +1,4 @@
-export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error' | 'Omitido' | 'Cancelado';
+export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error' | 'Omitido' | 'Cancelado' | 'Deshabilitado';
 
 export interface PC {
   id: string;

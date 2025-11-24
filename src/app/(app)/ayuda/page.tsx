@@ -29,6 +29,8 @@ import {
   CheckCircle,
   Ban,
   GitBranch,
+  Trash2,
+  ToggleLeft
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge as BadgeUI } from "@/components/ui/badge";
@@ -169,6 +171,7 @@ export default function HelpPage() {
                             <li><BadgeUI className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</BadgeUI>: El agente está ejecutando una actualización en este momento.</li>
                             <li><BadgeUI variant="destructive">Error</BadgeUI>: Ocurrió un problema durante el último intento de actualización. Revisa el historial para más detalles.</li>
                             <li><BadgeUI className="bg-yellow-500 text-white">Cancelado</BadgeUI>: La tarea de actualización fue cancelada manualmente desde el panel.</li>
+                            <li><BadgeUI className="bg-slate-500 text-white">Deshabilitado</BadgeUI>: La PC está inactiva y no recibirá órdenes de actualización.</li>
                          </ul>
                     </li>
                     <li>
@@ -176,6 +179,13 @@ export default function HelpPage() {
                     </li>
                     <li>
                         <strong>Botón "Actualizar Ahora":</strong> Este es el disparador principal. Al hacer clic, se crea una tarea de actualización para esa PC. El sistema es inteligente: si la PC ya tiene la última versión, el agente lo detectará y simplemente reportará que no necesita actualizarse.
+                    </li>
+                    <li>
+                        <strong>Menú de Acciones (⋮):</strong> Este menú te da opciones adicionales para gestionar la PC:
+                         <ul className="list-[square] space-y-2 pl-5 mt-2 text-sm">
+                             <li><span className="inline-flex items-center gap-2"><ToggleLeft className="h-4 w-4"/> <strong>Deshabilitar/Habilitar:</strong></span> Permite activar o desactivar una PC. Una PC deshabilitada no puede recibir tareas de actualización. Es útil para equipos en mantenimiento.</li>
+                             <li><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive"/> <strong>Eliminar:</strong></span> Borra permanentemente la PC y todo su historial del sistema. Úsalo para equipos que ya no forman parte de la red.</li>
+                         </ul>
                     </li>
                 </ul>
 
@@ -207,7 +217,10 @@ export default function HelpPage() {
                         <strong>Directorio de instalación de Softland:</strong> La ruta local en las PCs cliente donde está instalado Softland (ej. `C:\SoftlandERP`). El agente usará esta ruta para reemplazar los archivos.
                     </li>
                      <li>
-                        <strong>Usuario Administrador:</strong> Define la cuenta de usuario (preferiblemente de dominio) con la que se debe instalar el servicio del agente. Esto es crucial para que el agente tenga los permisos necesarios para detener servicios y modificar archivos.
+                        <strong>Nombres de los servicios:</strong> Define los servicios de Windows que deben detenerse antes de actualizar. **Puedes listar varios servicios separándolos por comas** (ej: `Servicio1,Servicio POS`).
+                    </li>
+                     <li>
+                        <strong>Usuario Administrador:</strong> Define la cuenta de usuario con la que se debe instalar el servicio del agente. Es crucial que esta cuenta tenga permisos de administrador local en la PC y acceso a la ruta de red. El formato debe ser `DOMINIO\usuario` (ej. `ING\admin.softland`).
                     </li>
                 </ul>
 
@@ -218,7 +231,7 @@ export default function HelpPage() {
                         <ol className="list-decimal space-y-2 pl-5 mt-2">
                             <li>Prepara un archivo de texto con extensión `.csv`.</li>
                             <li>En cada línea, escribe el ID único de la PC, una coma, y el nombre de la PC. No incluyas encabezados. Ejemplo: `pc-01,CAJA-01`.</li>
-                            <li>Sube el archivo usando el selector y haz clic en "Importar PCs". El sistema añadirá todos los equipos nuevos a la base de datos.</li>
+                            <li>Sube el archivo usando el selector y haz clic en "Importar PCs". El sistema añadirá todos los equipos nuevos a la base de datos, omitiendo los que ya existan.</li>
                         </ol>
                     </li>
                 </ul>
@@ -267,10 +280,10 @@ export default function HelpPage() {
                         </ul>
                     </li>
                     <li>
-                        <strong>Ingresar Credenciales:</strong>
+                        <strong>Ingresar Credenciales (¡Paso Crucial!):</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>El script te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `DOMINIO\usuario.servicio`).</li>
-                             <li>Estas credenciales se usarán para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.**</li>
+                             <li>El script te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\admin.softland`).</li>
+                             <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.** Son almacenadas de forma segura por el sistema operativo para el servicio.</li>
                         </ul>
                     </li>
                 </ol>

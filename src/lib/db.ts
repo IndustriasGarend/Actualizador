@@ -34,7 +34,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'pendiente', -- pendiente, en_progreso, completado, error, cancelado
     createdAt TEXT DEFAULT (datetime('now')),
     updatedAt TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (pcId) REFERENCES pcs(id)
+    FOREIGN KEY (pcId) REFERENCES pcs(id) ON DELETE CASCADE
   );
 `);
 
@@ -49,18 +49,26 @@ db.exec(`
     status TEXT NOT NULL, -- Éxito, Fallo, Omitido, Cancelado
     message TEXT,
     versionId TEXT,
-    FOREIGN KEY (pcId) REFERENCES pcs(id)
+    FOREIGN KEY (pcId) REFERENCES pcs(id) ON DELETE CASCADE
   );
 `);
+
+// Habilitar claves foráneas
+db.exec('PRAGMA foreign_keys = ON;');
 
 
 // -- Datos Iniciales (Solo para desarrollo/demostración) --
 if (process.env.NODE_ENV !== 'production') {
+    // Limpiar tablas para un estado limpio en cada reinicio en desarrollo
+    db.exec('DELETE FROM logs');
+    db.exec('DELETE FROM tasks');
+    db.exec('DELETE FROM pcs');
+
     const pcs = [
         { id: 'pc-1', name: 'CAJA-01', ip: '192.168.1.101', status: 'Actualizado', lastUpdate: '2024-05-19T10:00:00Z', versionId: '2024.05.18', currentTaskId: null },
         { id: 'pc-2', name: 'CAJA-02', ip: '192.168.1.102', status: 'Pendiente', lastUpdate: '2024-05-10T14:30:00Z', versionId: '2024.05.10', currentTaskId: null },
         { id: 'pc-3', name: 'OFICINA-CONTABLE', ip: '192.168.1.50', status: 'Error', lastUpdate: '2024-05-18T11:00:00Z', versionId: '2024.05.10', currentTaskId: null },
-        { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Pendiente', lastUpdate: null, versionId: null, currentTaskId: null },
+        { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Deshabilitado', lastUpdate: null, versionId: null, currentTaskId: null },
     ];
 
     const logs = [

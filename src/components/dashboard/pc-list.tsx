@@ -1,13 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Computer, ServerCrash, GitBranch, Ban } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { PC } from '@/lib/types';
 import { UpdateModal } from './update-modal';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from '@/hooks/use-toast';
+
 
 function ClientFormattedDate({ dateString }: { dateString: string | null }) {
   const [formattedDate, setFormattedDate] = useState<string | null>(null);
@@ -30,6 +49,8 @@ interface PcListProps {
 export function PcList({ initialPcs }: PcListProps) {
   const [pcs, setPcs] = useState<PC[]>(initialPcs);
   const [selectedPc, setSelectedPc] = useState<PC | null>(null);
+  const [pcToDelete, setPcToDelete] = useState<PC | null>(null);
+  const router = useRouter();
 
   const handleUpdate = (pc: PC) => {
     setSelectedPc(pc);
@@ -43,6 +64,54 @@ export function PcList({ initialPcs }: PcListProps) {
     setPcs(pcs.map(p => p.id === pcId ? {...p, status, lastUpdate: new Date().toISOString(), currentTaskId: taskId || p.currentTaskId} : p));
     if (status !== 'En progreso') {
         setSelectedPc(null);
+    }
+  };
+
+  const handleDeletePc = async () => {
+    if (!pcToDelete) return;
+    try {
+      const response = await fetch(`/api/pcs/${pcToDelete.id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error('No se pudo eliminar la PC.');
+      }
+      setPcs(pcs.filter(p => p.id !== pcToDelete.id));
+      toast({
+        title: "PC Eliminada",
+        description: `La PC ${pcToDelete.name} ha sido eliminada del sistema.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setPcToDelete(null);
+    }
+  };
+
+  const handleTogglePcStatus = async (pc: PC) => {
+    const newStatus = pc.status === 'Deshabilitado' ? 'Pendiente' : 'Deshabilitado';
+    try {
+      const response = await fetch(`/api/pcs/${pc.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!response.ok) {
+        throw new Error(`No se pudo ${newStatus === 'Deshabilitado' ? 'deshabilitar' : 'habilitar'} la PC.`);
+      }
+      setPcs(pcs.map(p => p.id === pc.id ? { ...p, status: newStatus } : p));
+      toast({
+        title: `PC ${newStatus === 'Deshabilitado' ? 'Deshabilitada' : 'Habilitada'}`,
+        description: `La PC ${pc.name} ha sido ${newStatus === 'Deshabilitado' ? 'deshabilitada' : 'habilitada'}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -60,26 +129,53 @@ export function PcList({ initialPcs }: PcListProps) {
     <>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {pcs.map((pc) => {
+          const isEnabled = pc.status !== 'Deshabilitado';
           return (
-            <Card key={pc.id} className="flex flex-col hover:shadow-lg transition-shadow duration-300">
+            <Card key={pc.id} className={cn("flex flex-col hover:shadow-lg transition-shadow duration-300", !isEnabled && "bg-muted/50")}>
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <Computer className="w-8 h-8 text-muted-foreground" />
-                  <Badge variant={
-                      pc.status === 'Error' ? 'destructive' : 
-                      pc.status === 'Cancelado' ? 'secondary' :
-                      pc.status === 'Pendiente' ? 'secondary' :
-                      'default'
-                    } className={cn(
-                      pc.status === 'Actualizado' && 'bg-accent text-accent-foreground hover:bg-accent/80',
-                      pc.status === 'En progreso' && 'bg-primary/80 animate-pulse',
-                      pc.status === 'Cancelado' && 'bg-yellow-500 text-white'
-                    )}>
-                      {pc.status === 'Cancelado' && <Ban className="w-3 h-3 mr-1.5" />}
-                      {pc.status}
-                  </Badge>
+                  <Computer className={cn("w-8 h-8 text-muted-foreground", !isEnabled && "text-muted-foreground/50")} />
+                  <div className="flex items-center gap-1">
+                    <Badge variant={
+                        pc.status === 'Error' ? 'destructive' : 
+                        pc.status === 'Cancelado' ? 'secondary' :
+                        pc.status === 'Pendiente' ? 'secondary' :
+                        pc.status === 'Deshabilitado' ? 'secondary' :
+                        'default'
+                      } className={cn(
+                        'text-xs',
+                        pc.status === 'Actualizado' && 'bg-accent text-accent-foreground hover:bg-accent/80',
+                        pc.status === 'En progreso' && 'bg-primary/80 animate-pulse',
+                        pc.status === 'Cancelado' && 'bg-yellow-500 text-white',
+                        pc.status === 'Deshabilitado' && 'bg-slate-500 text-white'
+                      )}>
+                        {pc.status === 'Cancelado' && <Ban className="w-3 h-3 mr-1.5" />}
+                        {pc.status}
+                    </Badge>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleTogglePcStatus(pc)}>
+                            {isEnabled ? (
+                              <ToggleLeft className="mr-2 h-4 w-4" />
+                            ) : (
+                              <ToggleRight className="mr-2 h-4 w-4 text-accent" />
+                            )}
+                            <span>{isEnabled ? 'Deshabilitar' : 'Habilitar'}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setPcToDelete(pc)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Eliminar</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                  </div>
                 </div>
-                <CardTitle className="pt-4">{pc.name}</CardTitle>
+                <CardTitle className="pt-2">{pc.name}</CardTitle>
                 <CardDescription>IP: {pc.ip}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-4">
@@ -99,7 +195,7 @@ export function PcList({ initialPcs }: PcListProps) {
               <CardFooter>
                 <Button 
                   onClick={() => handleUpdate(pc)} 
-                  disabled={pc.status === 'En progreso'}
+                  disabled={pc.status === 'En progreso' || !isEnabled}
                   className="w-full"
                 >
                   Actualizar Ahora
@@ -110,6 +206,22 @@ export function PcList({ initialPcs }: PcListProps) {
         })}
       </div>
       {selectedPc && <UpdateModal pc={selectedPc} onClose={handleCloseModal} onUpdateComplete={handleUpdateComplete} />}
+       <AlertDialog open={pcToDelete !== null} onOpenChange={() => setPcToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de que deseas eliminar esta PC?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará la PC <span className="font-bold">{pcToDelete?.name}</span> y todo su historial de actualizaciones del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePc} className={buttonVariants({ variant: "destructive" })}>
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

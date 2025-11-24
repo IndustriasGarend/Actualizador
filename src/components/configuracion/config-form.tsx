@@ -122,11 +122,11 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 name="serviceName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre del servicio</FormLabel>
+                    <FormLabel>Nombres de los servicios</FormLabel>
                     <FormControl>
-                      <Input placeholder="Softland POS Sincronización" {...field} />
+                      <Input placeholder="Servicio1,Servicio2" {...field} />
                     </FormControl>
-                    <FormDescription>Servicio que se detendrá antes de actualizar.</FormDescription>
+                    <FormDescription>Servicios que se detendrán, separados por comas.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -140,9 +140,9 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                   <FormItem>
                     <FormLabel>Usuario Administrador</FormLabel>
                     <FormControl>
-                      <Input placeholder="dominio\\usuario" {...field} />
+                      <Input placeholder="DOMINIO\\usuario" {...field} />
                     </FormControl>
-                    <FormDescription>Cuenta para ejecutar el servicio en el cliente.</FormDescription>
+                    <FormDescription>Cuenta para ejecutar el servicio en el cliente (ej. `DOMINIO\usuario.servicio`).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -156,7 +156,7 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
-                    <FormDescription>Se solicitará al instalar el servicio en el cliente.</FormDescription>
+                    <FormDescription>Se solicitará al instalar el servicio en el cliente. No se guarda en el servidor.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
