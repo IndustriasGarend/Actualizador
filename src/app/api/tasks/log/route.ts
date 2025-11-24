@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
-    const { pcId, pcName, action, status, message, versionId, taskId, agentVersion } = await request.json();
+    const { pcId, pcName, action, status, message, versionId, taskId, agentVersion, ip } = await request.json();
 
     if (!pcId || !pcName || !action || !status) {
       return NextResponse.json({ message: 'Faltan parámetros requeridos' }, { status: 400 });
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     // Construir la consulta de actualización dinámicamente
     let updateQuery = "UPDATE pcs SET status = ?, lastUpdate = datetime('now')";
-    const params = [pcStatus];
+    const params: (string | number | null)[] = [pcStatus];
 
     if (pcStatus === 'Actualizado' && versionId) {
         updateQuery += ", versionId = ?";
@@ -36,6 +36,10 @@ export async function POST(request: Request) {
     if (agentVersion) {
         updateQuery += ", agentVersion = ?";
         params.push(agentVersion);
+    }
+    if (ip) {
+        updateQuery += ", ip = ?";
+        params.push(ip);
     }
 
     // Si el estado final no es 'En progreso', limpiamos la tarea actual.

@@ -73,10 +73,10 @@ export function BulkAddCard() {
             Adición Masiva de PCs
         </CardTitle>
         <CardDescription>
-          Añada múltiples PCs al sistema subiendo un archivo CSV. El archivo debe tener 2 columnas: 
-          la primera para el ID único de la PC y la segunda para el nombre. No incluya una fila de encabezado.
+          Añada múltiples PCs al sistema subiendo un archivo CSV. El archivo debe tener hasta 4 columnas: 
+          ID (obligatorio), Nombre (obligatorio), Alias (opcional), Ubicación (opcional). No incluya una fila de encabezado.
           <br />
-          Ejemplo de formato: `pc-01,CAJA-01`
+          Ejemplo de formato: `pc-01,CAJA-01,Juan Pérez,Tienda Principal`
         </CardDescription>
       </CardHeader>
       <CardContent>

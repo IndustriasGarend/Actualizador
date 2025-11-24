@@ -3,12 +3,14 @@ export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error' | '
 export interface PC {
   id: string;
   name: string;
-  ip: string;
+  ip: string | null;
   status: PCStatus;
   lastUpdate: string | null;
   versionId: string | null;
   currentTaskId: number | null;
   agentVersion: string | null;
+  alias: string | null;
+  location: string | null;
 }
 
 export type UpdateStatus = 'pending' | 'running' | 'success' | 'error';

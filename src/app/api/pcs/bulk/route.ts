@@ -23,19 +23,24 @@ export async function POST(request: Request) {
     }
 
     const pcsToAdd = parseResult.data
-      .map(row => ({ id: row[0]?.trim(), name: row[1]?.trim() }))
+      .map(row => ({ 
+        id: row[0]?.trim(), 
+        name: row[1]?.trim(),
+        alias: row[2]?.trim(),
+        location: row[3]?.trim(),
+      }))
       .filter(pc => pc.id && pc.name);
 
     if (pcsToAdd.length === 0) {
       return NextResponse.json({ message: 'El archivo CSV está vacío o no tiene el formato correcto.' }, { status: 400 });
     }
 
-    const stmt = db.prepare('INSERT OR IGNORE INTO pcs (id, name, ip, status) VALUES (?, ?, ?, ?)');
+    const stmt = db.prepare('INSERT OR IGNORE INTO pcs (id, name, alias, location, ip, status) VALUES (?, ?, ?, ?, ?, ?)');
     const insertMany = db.transaction((pcs) => {
       let changes = 0;
       for (const pc of pcs) {
         // La IP la dejamos como 'Desconocida' hasta el primer reporte del agente
-        const result = stmt.run(pc.id, pc.name, 'Desconocida', 'Pendiente');
+        const result = stmt.run(pc.id, pc.name, pc.alias, pc.location, 'Desconocida', 'Pendiente');
         changes += result.changes;
       }
       return changes;

@@ -18,12 +18,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS pcs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    ip TEXT NOT NULL,
+    ip TEXT,
     status TEXT NOT NULL DEFAULT 'Pendiente',
     lastUpdate TEXT,
     versionId TEXT,
     currentTaskId INTEGER,
-    agentVersion TEXT
+    agentVersion TEXT,
+    alias TEXT,
+    location TEXT
   );
 `);
 
@@ -66,10 +68,10 @@ if (process.env.NODE_ENV !== 'production') {
     db.exec('DELETE FROM pcs');
 
     const pcs = [
-        { id: 'pc-1', name: 'CAJA-01', ip: '192.168.1.101', status: 'Actualizado', lastUpdate: '2024-05-19T10:00:00Z', versionId: '2024.05.18', currentTaskId: null, agentVersion: "1.0" },
-        { id: 'pc-2', name: 'CAJA-02', ip: '192.168.1.102', status: 'Pendiente', lastUpdate: '2024-05-10T14:30:00Z', versionId: '2024.05.10', currentTaskId: null, agentVersion: "0.9" },
-        { id: 'pc-3', name: 'OFICINA-CONTABLE', ip: '192.168.1.50', status: 'Error', lastUpdate: '2024-05-18T11:00:00Z', versionId: '2024.05.10', currentTaskId: null, agentVersion: "1.0" },
-        { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Deshabilitado', lastUpdate: null, versionId: null, currentTaskId: null, agentVersion: null },
+        { id: 'pc-1', name: 'CAJA-01', ip: '192.168.1.101', status: 'Actualizado', lastUpdate: '2024-05-19T10:00:00Z', versionId: '2024.05.18', currentTaskId: null, agentVersion: "1.0", alias: 'Juan Pérez', location: 'Tienda Principal' },
+        { id: 'pc-2', name: 'CAJA-02', ip: '192.168.1.102', status: 'Pendiente', lastUpdate: '2024-05-10T14:30:00Z', versionId: '2024.05.10', currentTaskId: null, agentVersion: "0.9", alias: 'Ana Gómez', location: 'Tienda Principal' },
+        { id: 'pc-3', name: 'OFICINA-CONTABLE', ip: '192.168.1.50', status: 'Error', lastUpdate: '2024-05-18T11:00:00Z', versionId: '2024.05.10', currentTaskId: null, agentVersion: "1.0", alias: 'Contabilidad', location: 'Oficinas Centrales' },
+        { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Deshabilitado', lastUpdate: null, versionId: null, currentTaskId: null, agentVersion: null, alias: 'Carlos Ruiz', location: 'Bodega Central' },
     ];
 
     const logs = [
@@ -79,7 +81,7 @@ if (process.env.NODE_ENV !== 'production') {
         { id: 4, pcId: 'pc-3', pcName: 'OFICINA-CONTABLE', timestamp: '2024-05-18T11:00:00Z', action: 'Inicio de actualización', status: 'Éxito', message: 'Iniciando proceso para OFICINA-CONTABLE.', versionId: null },
     ];
     
-    const insertPc = db.prepare('INSERT OR IGNORE INTO pcs (id, name, ip, status, lastUpdate, versionId, currentTaskId, agentVersion) VALUES (@id, @name, @ip, @status, @lastUpdate, @versionId, @currentTaskId, @agentVersion)');
+    const insertPc = db.prepare('INSERT OR IGNORE INTO pcs (id, name, ip, status, lastUpdate, versionId, currentTaskId, agentVersion, alias, location) VALUES (@id, @name, @ip, @status, @lastUpdate, @versionId, @currentTaskId, @agentVersion, @alias, @location)');
     const insertLog = db.prepare('INSERT OR IGNORE INTO logs (id, pcId, pcName, timestamp, action, status, message, versionId) VALUES (@id, @pcId, @pcName, @timestamp, @action, @status, @message, @versionId)');
 
     const insertManyPcs = db.transaction((items) => {

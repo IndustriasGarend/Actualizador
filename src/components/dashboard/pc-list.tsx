@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info } from 'lucide-react';
+import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -183,10 +183,24 @@ export function PcList({ initialPcs }: PcListProps) {
                   </div>
                 </div>
                 <CardTitle className="pt-2">{pc.name}</CardTitle>
-                <CardDescription>IP: {pc.ip}</CardDescription>
+                <CardDescription>Última IP: {pc.ip || 'Desconocida'}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-4">
-                <div className="text-sm text-muted-foreground">
+                <div className="space-y-1 text-sm">
+                   {pc.alias && (
+                        <div className="text-muted-foreground flex items-center gap-2">
+                            <UserCircle className="w-4 h-4" />
+                            <p>{pc.alias}</p>
+                        </div>
+                    )}
+                    {pc.location && (
+                        <div className="text-muted-foreground flex items-center gap-2">
+                            <MapPin className="w-4 h-4" />
+                            <p>{pc.location}</p>
+                        </div>
+                    )}
+                </div>
+                <div className="text-sm text-muted-foreground border-t pt-4">
                   <p>Última actualización:</p>
                   <p className="font-medium text-foreground/80">
                     <ClientFormattedDate dateString={pc.lastUpdate} />
