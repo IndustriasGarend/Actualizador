@@ -1,0 +1,69 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  Computer,
+  Settings,
+  History,
+  Rocket,
+} from 'lucide-react';
+import {
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+} from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+
+export function MainSidebar() {
+  const pathname = usePathname();
+
+  const menuItems = [
+    { href: '/', label: 'Panel', icon: Computer },
+    { href: '/configuracion', label: 'Configuración', icon: Settings },
+    { href: '/historial', label: 'Historial', icon: History },
+  ];
+
+  return (
+    <>
+      <SidebarHeader className="p-0">
+        <div className="flex items-center gap-3 p-4">
+          <Rocket className="h-8 w-8 text-sidebar-foreground" />
+          <h1 className="text-xl font-semibold text-sidebar-foreground whitespace-nowrap">
+            Softland Updater
+          </h1>
+        </div>
+      </SidebarHeader>
+      <Separator className="bg-sidebar-border" />
+      <SidebarContent>
+        <SidebarMenu>
+          {menuItems.map((item) => (
+            <SidebarMenuItem key={item.href}>
+              <Link href={item.href} passHref legacyBehavior>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+                  tooltip={item.label}
+                >
+                  <a>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </a>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarContent>
+      <SidebarFooter>
+         <Separator className="bg-sidebar-border" />
+        <div className="p-4">
+            <p className="text-xs text-sidebar-foreground/70 text-center">© 2024</p>
+        </div>
+      </SidebarFooter>
+    </>
+  );
+}
