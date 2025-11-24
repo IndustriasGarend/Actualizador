@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle } from 'lucide-react';
+import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle, Edit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import type { PC } from '@/lib/types';
 import { UpdateModal } from './update-modal';
+import { EditPcModal } from './edit-pc-modal';
 import { cn } from '@/lib/utils';
 import { LATEST_AGENT_VERSION } from '@/lib/data';
 import {
@@ -15,6 +16,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -53,24 +55,34 @@ interface PcListProps {
 
 export function PcList({ initialPcs }: PcListProps) {
   const [pcs, setPcs] = useState<PC[]>(initialPcs);
-  const [selectedPc, setSelectedPc] = useState<PC | null>(null);
+  const [selectedPcForUpdate, setSelectedPcForUpdate] = useState<PC | null>(null);
+  const [selectedPcForEdit, setSelectedPcForEdit] = useState<PC | null>(null);
   const [pcToDelete, setPcToDelete] = useState<PC | null>(null);
   const router = useRouter();
 
   const handleUpdate = (pc: PC) => {
-    setSelectedPc(pc);
+    setSelectedPcForUpdate(pc);
   };
   
-  const handleCloseModal = () => {
-    setSelectedPc(null);
+  const handleCloseUpdateModal = () => {
+    setSelectedPcForUpdate(null);
+  };
+  
+  const handleCloseEditModal = () => {
+    setSelectedPcForEdit(null);
   };
 
   const handleUpdateComplete = (pcId: string, status: PC['status'], taskId?: number | null) => {
     setPcs(pcs.map(p => p.id === pcId ? {...p, status, lastUpdate: new Date().toISOString(), currentTaskId: taskId || p.currentTaskId} : p));
     if (status !== 'En progreso') {
-        setSelectedPc(null);
+        setSelectedPcForUpdate(null);
     }
   };
+
+  const handleEditComplete = (updatedPc: PC) => {
+    setPcs(pcs.map(p => p.id === updatedPc.id ? updatedPc : p));
+    setSelectedPcForEdit(null);
+  }
 
   const handleDeletePc = async () => {
     if (!pcToDelete) return;
@@ -167,6 +179,10 @@ export function PcList({ initialPcs }: PcListProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                           <DropdownMenuItem onClick={() => setSelectedPcForEdit(pc)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Editar</span>
+                            </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleTogglePcStatus(pc)}>
                             {isEnabled ? (
                               <><ToggleLeft className="mr-2 h-4 w-4" /><span>Deshabilitar</span></>
@@ -174,6 +190,7 @@ export function PcList({ initialPcs }: PcListProps) {
                               <><ToggleRight className="mr-2 h-4 w-4 text-accent" /><span>Habilitar</span></>
                             )}
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => setPcToDelete(pc)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                             <Trash2 className="mr-2 h-4 w-4" />
                             <span>Eliminar</span>
@@ -240,7 +257,8 @@ export function PcList({ initialPcs }: PcListProps) {
           );
         })}
       </div>
-      {selectedPc && <UpdateModal pc={selectedPc} onClose={handleCloseModal} onUpdateComplete={handleUpdateComplete} />}
+      {selectedPcForUpdate && <UpdateModal pc={selectedPcForUpdate} onClose={handleCloseUpdateModal} onUpdateComplete={handleUpdateComplete} />}
+      {selectedPcForEdit && <EditPcModal pc={selectedPcForEdit} onClose={handleCloseEditModal} onSave={handleEditComplete} />}
        <AlertDialog open={pcToDelete !== null} onOpenChange={() => setPcToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
