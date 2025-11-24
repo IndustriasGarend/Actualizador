@@ -1,4 +1,4 @@
-export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error';
+export type PCStatus = 'Actualizado' | 'Pendiente' | 'En progreso' | 'Error' | 'Omitido';
 
 export interface PC {
   id: string;
@@ -6,6 +6,7 @@ export interface PC {
   ip: string;
   status: PCStatus;
   lastUpdate: string | null;
+  versionId: string | null;
 }
 
 export type UpdateStatus = 'pending' | 'running' | 'success' | 'error';
@@ -18,11 +19,13 @@ export interface UpdateStep {
 
 export interface LogEntry {
   id: string;
+  pcId: string;
   pcName: string;
   timestamp: string;
   action: string;
-  status: 'Éxito' | 'Fallo';
+  status: 'Éxito' | 'Fallo' | 'Omitido';
   message: string;
+  versionId?: string | null;
 }
 
 export interface SystemConfig {

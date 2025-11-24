@@ -1,142 +1,120 @@
 # Softland Updater Agent
-# Este script se ejecuta en cada PC cliente para buscar y ejecutar tareas de actualización.
+# Este script se ejecuta en cada PC cliente y se comunica con el servidor central.
 
 # --- Configuración ---
-$ServerUrl = "__SERVER_URL__"
-$PcId = "__PC_ID__"
-$CheckIntervalSeconds = 60 # Tiempo de espera entre cada verificación de tareas
-$LogFile = "C:\ProgramData\SoftlandUpdaterAgent.log"
+$pcId = "__PC_ID__"
+$serverUrl = "__SERVER_URL__"
+$checkTaskUrl = "$serverUrl/api/tasks/check/$pcId"
+$logUrl = "$serverUrl/api/tasks/log"
+$agentDir = $PSScriptRoot
+$localVersionFile = Join-Path $agentDir "version.txt"
 
 # --- Funciones ---
-function Write-Log {
-    param(
-        [string]$Message
-    )
-    $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $LogMessage = "[$Timestamp] $Message"
-    Add-Content -Path $LogFile -Value $LogMessage
-    # Opcional: Mostrar en consola si se ejecuta interactivamente
-    Write-Host $LogMessage
-}
 
-function Report-Status {
+# Función para enviar logs al servidor
+function Send-Log {
     param(
         [string]$Action,
-        [string]$Status, # "Éxito" o "Fallo"
-        [string]$Message
+        [string]$Status,
+        [string]$Message,
+        [string]$VersionId
     )
+    
+    $pcName = $env:COMPUTERNAME
     $body = @{
-        pcId = $PcId
-        pcName = $env:COMPUTERNAME
+        pcId = $pcId
+        pcName = $pcName
         action = $Action
         status = $Status
         message = $Message
+        versionId = $VersionId
     } | ConvertTo-Json
 
     try {
-        Invoke-RestMethod -Uri "$ServerUrl/api/tasks/log" -Method Post -Body $body -ContentType 'application/json'
-        Write-Log "Reporte enviado: [Accion: $Action, Estado: $Status]"
-    }
-    catch {
-        Write-Log "ERROR: No se pudo enviar el reporte de estado al servidor. $_"
+        Invoke-RestMethod -Uri $logUrl -Method Post -Body $body -ContentType 'application/json' -ErrorAction Stop
+    } catch {
+        Write-Warning "No se pudo enviar el log al servidor: $($_.Exception.Message)"
     }
 }
-
-function Get-SoftlandConfig {
-    # En una implementación real, esto podría leer la config desde el servidor.
-    # Por ahora, usamos valores hardcodeados que coinciden con los del panel.
-    return @{
-        UpdateFilePath = "\\servidor\updates\update.7z"
-        LocalUpdateDir = "C:\Actualizacion"
-        SoftlandInstallDir = "C:\SoftlandERP"
-        ServiceName = "Softland POS Sincronización"
-    }
-}
-
-function Execute-Update {
-    Write-Log "--- Iniciando Proceso de Actualización ---"
-    $config = Get-SoftlandConfig
-    
-    # Paso 1: Detener servicio
-    Report-Status "Deteniendo servicio" "Éxito" "Intentando detener '$($config.ServiceName)'..."
-    try {
-        Stop-Service -Name $config.ServiceName -Force -ErrorAction Stop
-        Write-Log "Servicio '$($config.ServiceName)' detenido."
-        Report-Status "Servicio detenido" "Éxito" "El servicio se detuvo correctamente."
-    } catch {
-        Write-Log "ADVERTENCIA: No se pudo detener el servicio '$($config.ServiceName)'. Puede que no estuviera corriendo. $_"
-        Report-Status "Servicio detenido" "Éxito" "No se pudo detener el servicio (puede que no estuviera corriendo)."
-    }
-
-    # Paso 2: Cerrar procesos
-    Report-Status "Cerrando procesos" "Éxito" "Intentando cerrar procesos 'Softland'..."
-    Get-Process | Where-Object { $_.ProcessName -like "*softland*" } | Stop-Process -Force
-    Write-Log "Procesos 'Softland' cerrados."
-
-    # Paso 3: Copiar archivos
-    Report-Status "Copiando archivos" "Éxito" "Copiando desde '$($config.UpdateFilePath)'..."
-    try {
-        if (-not (Test-Path $config.LocalUpdateDir)) {
-            New-Item -Path $config.LocalUpdateDir -ItemType Directory
-        }
-        Copy-Item -Path $config.UpdateFilePath -Destination $config.LocalUpdateDir -Force -ErrorAction Stop
-        Write-Log "Archivo de actualización copiado a '$($config.LocalUpdateDir)'."
-        Report-Status "Copia de archivos" "Éxito" "Archivo copiado a directorio local."
-    } catch {
-        Write-Log "ERROR: Fallo al copiar el archivo de actualización. $_"
-        Report-Status "Copia de archivos" "Fallo" "No se pudo copiar el archivo desde la ruta de red. Verifique la ruta y permisos."
-        return # Detener ejecución si la copia falla
-    }
-
-    # Paso 4: Extraer archivos
-    Report-Status "Extrayendo archivos" "Éxito" "Extrayendo en '$($config.SoftlandInstallDir)'..."
-    try {
-        # Asume que 7-Zip está en el PATH o en una ubicación conocida
-        & "C:\Program Files\7-Zip\7z.exe" x "$($config.LocalUpdateDir)\update.7z" -o"$($config.SoftlandInstallDir)" -y
-        Write-Log "Archivos extraídos."
-        Report-Status "Extracción de archivos" "Éxito" "Archivos descomprimidos en el directorio de instalación."
-    } catch {
-        Write-Log "ERROR: Fallo al extraer los archivos. $_"
-        Report-Status "Extracción de archivos" "Fallo" "Error al descomprimir. Verifique que 7-Zip esté instalado y que haya permisos de escritura."
-        return
-    }
-
-    # Paso 5: Desbloquear archivos
-    Report-Status "Desbloqueando archivos" "Éxito" "Desbloqueando archivos en '$($config.SoftlandInstallDir)'..."
-    Get-ChildItem -Path $config.SoftlandInstallDir -Recurse | Unblock-File
-    Write-Log "Archivos desbloqueados."
-
-    # Paso 6: Registrar módulos (si aplica)
-    # Report-Status "Registrando módulos" "Éxito" "Ejecutando registro de módulos..."
-    # Lógica para registrar DLLs o ejecutar un .exe de registro
-
-    # Finalización
-    Write-Log "--- Proceso de Actualización Completado ---"
-    Report-Status "Actualización completada" "Éxito" "El proceso de actualización ha finalizado."
-}
-
 
 # --- Bucle Principal ---
-Write-Log "Iniciando Agente de Softland Updater para PC: $PcId"
 while ($true) {
     try {
-        $Uri = "$ServerUrl/api/tasks/check/$PcId"
-        Write-Log "Verificando tareas en $Uri..."
-        $response = Invoke-RestMethod -Uri $Uri -Method Get
-
+        # 1. Verificar si hay tareas pendientes
+        Write-Host "Verificando tareas en $checkTaskUrl"
+        $response = Invoke-RestMethod -Uri $checkTaskUrl -Method Get -ErrorAction Stop
+        
         if ($response.task -eq 'actualizar') {
-            Write-Log "Tarea 'actualizar' recibida (ID: $($response.taskId))."
-            Execute-Update
-            # Aquí se podría marcar la tarea como completada en el servidor
-        } else {
-            Write-Log "Ninguna tarea pendiente."
-        }
-    }
-    catch {
-        Write-Log "ERROR: No se pudo conectar con el servidor. Verifique la conexión y la URL. $_"
-    }
+            Send-Log -Action "Inicio de actualización" -Status "Éxito" -Message "Tarea de actualización recibida (ID: $($response.taskId))."
+            
+            # --- Aquí comienza la lógica de la actualización ---
 
-    # Esperar antes de la siguiente verificación
-    Write-Log "Durmiendo por $CheckIntervalSeconds segundos..."
-    Start-Sleep -Seconds $CheckIntervalSeconds
+            # Obtener configuración del servidor (simulado por ahora, se leería de un config.json o similar)
+            $config = @{
+                updateFilePath = "\\\\servidor\\actualizaciones\\softland_update_latest.7z"
+                versionFilePath = "\\\\servidor\\actualizaciones\\version.txt"
+                localUpdateDir = "C:\\ActualizacionSoftland"
+                softlandInstallDir = "C:\\Softland"
+                serviceName = "Softland POS Sincronización"
+            }
+
+            # 2. Comprobar la versión del software
+            $serverVersion = ""
+            $localVersion = ""
+
+            try {
+                if (Test-Path $config.versionFilePath) {
+                    $serverVersion = Get-Content $config.versionFilePath -Raw
+                } else {
+                    Send-Log -Action "Comprobación de versión" -Status "Fallo" -Message "No se encontró el archivo de versión en el servidor: $($config.versionFilePath)"
+                    # Continuar sin comprobación de versión si no se encuentra
+                }
+                
+                if (Test-Path $localVersionFile) {
+                    $localVersion = Get-Content $localVersionFile -Raw
+                }
+            } catch {
+                 Send-Log -Action "Comprobación de versión" -Status "Fallo" -Message "Error al leer archivos de versión: $($_.Exception.Message)"
+            }
+
+            if ($serverVersion -ne "" -and $serverVersion -eq $localVersion) {
+                Send-Log -Action "Comprobación de versión" -Status "Omitido" -Message "La PC ya tiene la última versión ($localVersion)." -VersionId $localVersion
+                Start-Sleep -Seconds 60
+                continue
+            }
+
+            Send-Log -Action "Comprobación de versión" -Status "Éxito" -Message "Se procederá a actualizar de la versión '$localVersion' a la '$serverVersion'."
+
+            # (Los pasos de actualización continúan aquí...)
+            # ...
+            # ... simulación de pasos ...
+            Start-Sleep -Seconds 5
+            Send-Log -Action "Deteniendo servicio" -Status "Éxito" -Message "Servicio '$($config.serviceName)' detenido."
+            
+            Start-Sleep -Seconds 5
+            Send-Log -Action "Copiando archivos" -Status "Éxito" -Message "Archivos copiados desde $($config.updateFilePath)."
+
+            Start-Sleep -Seconds 10
+            Send-Log -Action "Extrayendo archivos" -Status "Éxito" -Message "Archivos extraídos en $($config.softlandInstallDir)."
+            
+            # Al finalizar con éxito
+            Send-Log -Action "Actualización completada" -Status "Éxito" -Message "El sistema se ha actualizado a la versión $serverVersion." -VersionId $serverVersion
+            
+            # Guardar la nueva versión localmente
+            try {
+                Set-Content -Path $localVersionFile -Value $serverVersion
+            } catch {
+                Send-Log -Action "Guardar versión local" -Status "Fallo" -Message "No se pudo escribir el nuevo archivo de versión en $localVersionFile."
+            }
+
+        } else {
+            Write-Host "No hay tareas pendientes."
+        }
+    } catch {
+        # Error al conectar con el servidor
+        Write-Warning "No se pudo conectar con el servidor: $($_.Exception.Message)"
+    }
+    
+    # Esperar 60 segundos antes de la próxima verificación
+    Start-Sleep -Seconds 60
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Computer, ServerCrash } from 'lucide-react';
+import { Computer, ServerCrash, GitBranch } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -77,13 +77,19 @@ export function PcList({ initialPcs }: PcListProps) {
                 <CardTitle className="pt-4">{pc.name}</CardTitle>
                 <CardDescription>IP: {pc.ip}</CardDescription>
               </CardHeader>
-              <CardContent className="flex-grow">
+              <CardContent className="flex-grow space-y-4">
                 <div className="text-sm text-muted-foreground">
                   <p>Última actualización:</p>
                   <p className="font-medium text-foreground/80">
                     <ClientFormattedDate dateString={pc.lastUpdate} />
                   </p>
                 </div>
+                {pc.versionId && (
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <GitBranch className="w-4 h-4" />
+                        <p>Versión: <span className="font-medium text-foreground/80">{pc.versionId}</span></p>
+                    </div>
+                )}
               </CardContent>
               <CardFooter>
                 <Button 

@@ -18,9 +18,10 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS pcs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    ip TEXT NOT NULL UNIQUE,
+    ip TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Pendiente',
-    lastUpdate TEXT
+    lastUpdate TEXT,
+    versionId TEXT
   );
 `);
 
@@ -44,8 +45,9 @@ db.exec(`
     pcName TEXT NOT NULL,
     timestamp TEXT DEFAULT (datetime('now')),
     action TEXT NOT NULL,
-    status TEXT NOT NULL, -- Éxito, Fallo
+    status TEXT NOT NULL, -- Éxito, Fallo, Omitido
     message TEXT,
+    versionId TEXT,
     FOREIGN KEY (pcId) REFERENCES pcs(id)
   );
 `);
@@ -54,21 +56,21 @@ db.exec(`
 // -- Datos Iniciales (Solo para desarrollo/demostración) --
 if (process.env.NODE_ENV !== 'production') {
     const pcs = [
-        { id: 'pc-1', name: 'CAJA-01', ip: '192.168.1.101', status: 'Actualizado', lastUpdate: '2024-05-19T10:00:00Z' },
-        { id: 'pc-2', name: 'CAJA-02', ip: '192.168.1.102', status: 'Pendiente', lastUpdate: '2024-05-10T14:30:00Z' },
-        { id: 'pc-3', name: 'OFICINA-CONTABLE', ip: '192.168.1.50', status: 'Error', lastUpdate: '2024-05-18T11:00:00Z' },
-        { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Pendiente', lastUpdate: null },
+        { id: 'pc-1', name: 'CAJA-01', ip: '192.168.1.101', status: 'Actualizado', lastUpdate: '2024-05-19T10:00:00Z', versionId: '2024.05.18' },
+        { id: 'pc-2', name: 'CAJA-02', ip: '192.168.1.102', status: 'Pendiente', lastUpdate: '2024-05-10T14:30:00Z', versionId: '2024.05.10' },
+        { id: 'pc-3', name: 'OFICINA-CONTABLE', ip: '192.168.1.50', status: 'Error', lastUpdate: '2024-05-18T11:00:00Z', versionId: '2024.05.10' },
+        { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Pendiente', lastUpdate: null, versionId: null },
     ];
 
     const logs = [
-        { id: 1, pcId: 'pc-1', pcName: 'CAJA-01', timestamp: '2024-05-19T10:05:00Z', action: 'Actualización completada', status: 'Éxito', message: 'Todos los módulos actualizados.' },
-        { id: 2, pcId: 'pc-1', pcName: 'CAJA-01', timestamp: '2024-05-19T10:04:00Z', action: 'Registrando módulos', status: 'Éxito', message: 'Softland.RegistroModulos.v700.exe ejecutado.' },
-        { id: 3, pcId: 'pc-3', pcName: 'OFICINA-CONTABLE', timestamp: '2024-05-18T11:02:00Z', action: 'Extrayendo archivos', status: 'Fallo', message: 'Acceso denegado a C:\\SoftlandERP\\sl.dll.' },
-        { id: 4, pcId: 'pc-3', pcName: 'OFICINA-CONTABLE', timestamp: '2024-05-18T11:00:00Z', action: 'Inicio de actualización', status: 'Éxito', message: 'Iniciando proceso para OFICINA-CONTABLE.' },
+        { id: 1, pcId: 'pc-1', pcName: 'CAJA-01', timestamp: '2024-05-19T10:05:00Z', action: 'Actualización completada', status: 'Éxito', message: 'Todos los módulos actualizados.', versionId: '2024.05.18' },
+        { id: 2, pcId: 'pc-1', pcName: 'CAJA-01', timestamp: '2024-05-19T10:04:00Z', action: 'Registrando módulos', status: 'Éxito', message: 'Softland.RegistroModulos.v700.exe ejecutado.', versionId: null },
+        { id: 3, pcId: 'pc-3', pcName: 'OFICINA-CONTABLE', timestamp: '2024-05-18T11:02:00Z', action: 'Extrayendo archivos', status: 'Fallo', message: 'Acceso denegado a C:\\SoftlandERP\\sl.dll.', versionId: null },
+        { id: 4, pcId: 'pc-3', pcName: 'OFICINA-CONTABLE', timestamp: '2024-05-18T11:00:00Z', action: 'Inicio de actualización', status: 'Éxito', message: 'Iniciando proceso para OFICINA-CONTABLE.', versionId: null },
     ];
     
-    const insertPc = db.prepare('INSERT OR IGNORE INTO pcs (id, name, ip, status, lastUpdate) VALUES (@id, @name, @ip, @status, @lastUpdate)');
-    const insertLog = db.prepare('INSERT OR IGNORE INTO logs (id, pcId, pcName, timestamp, action, status, message) VALUES (@id, @pcId, @pcName, @timestamp, @action, @status, @message)');
+    const insertPc = db.prepare('INSERT OR IGNORE INTO pcs (id, name, ip, status, lastUpdate, versionId) VALUES (@id, @name, @ip, @status, @lastUpdate, @versionId)');
+    const insertLog = db.prepare('INSERT OR IGNORE INTO logs (id, pcId, pcName, timestamp, action, status, message, versionId) VALUES (@id, @pcId, @pcName, @timestamp, @action, @status, @message, @versionId)');
 
     const insertManyPcs = db.transaction((items) => {
         for (const item of items) insertPc.run(item);

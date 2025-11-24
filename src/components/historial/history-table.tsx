@@ -12,7 +12,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import type { LogEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { FileText } from 'lucide-react';
+import { FileText, GitBranch } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface HistoryTableProps {
   logs: LogEntry[];
@@ -58,7 +59,7 @@ export function HistoryTable({ logs }: HistoryTableProps) {
                 <TableHead>Fecha y Hora</TableHead>
                 <TableHead>Acción</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Mensaje</TableHead>
+                <TableHead>Mensaje / Versión</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -70,11 +71,25 @@ export function HistoryTable({ logs }: HistoryTableProps) {
                     </TableCell>
                     <TableCell>{log.action}</TableCell>
                     <TableCell>
-                    <Badge variant={log.status === 'Éxito' ? 'default' : 'destructive'} className={log.status === 'Éxito' ? 'bg-accent hover:bg-accent/90' : ''}>
+                    <Badge variant={
+                        log.status === 'Éxito' ? 'default' : 
+                        log.status === 'Omitido' ? 'secondary' :
+                        'destructive'
+                    } className={cn(
+                        log.status === 'Éxito' && 'bg-accent hover:bg-accent/90',
+                    )}>
                         {log.status}
                     </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{log.message}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                        {log.message}
+                        {log.versionId && (
+                            <div className="flex items-center gap-1.5 text-xs pt-1">
+                                <GitBranch className="w-3 h-3" />
+                                <span>{log.versionId}</span>
+                            </div>
+                        )}
+                    </TableCell>
                 </TableRow>
                 ))}
             </TableBody>
