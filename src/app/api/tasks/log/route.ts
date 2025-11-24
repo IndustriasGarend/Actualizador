@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
-    const { pcId, pcName, action, status, message, versionId, taskId, agentVersion, ip } = await request.json();
+    const { pcId, pcName, action, status, message, versionId, taskId, agentVersion, ip, loggedUser } = await request.json();
 
     if (!pcId || !pcName || !action || !status) {
       return NextResponse.json({ message: 'Faltan parámetros requeridos' }, { status: 400 });
@@ -40,6 +40,10 @@ export async function POST(request: Request) {
     if (ip) {
         updateQuery += ", ip = ?";
         params.push(ip);
+    }
+    if (loggedUser) {
+        updateQuery += ", loggedUser = ?";
+        params.push(loggedUser);
     }
 
     // Si el estado final no es 'En progreso', limpiamos la tarea actual.

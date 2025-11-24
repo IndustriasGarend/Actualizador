@@ -193,6 +193,12 @@ export function PcList({ initialPcs }: PcListProps) {
                             <p>{pc.alias}</p>
                         </div>
                     )}
+                    {pc.loggedUser && (
+                        <div className="text-muted-foreground flex items-center gap-2">
+                            <UserCircle className="w-4 h-4" />
+                            <p>Usuario: <span className="font-medium text-foreground/80">{pc.loggedUser}</span></p>
+                        </div>
+                    )}
                     {pc.location && (
                         <div className="text-muted-foreground flex items-center gap-2">
                             <MapPin className="w-4 h-4" />

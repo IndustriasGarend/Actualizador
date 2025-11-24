@@ -11,6 +11,7 @@ export interface PC {
   agentVersion: string | null;
   alias: string | null;
   location: string | null;
+  loggedUser: string | null;
 }
 
 export type UpdateStatus = 'pending' | 'running' | 'success' | 'error';
