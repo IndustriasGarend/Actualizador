@@ -7,6 +7,7 @@ import {
   Settings,
   History,
   Rocket,
+  LifeBuoy,
 } from 'lucide-react';
 import {
   SidebarContent,
@@ -57,6 +58,20 @@ export function MainSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname.startsWith('/ayuda')}
+                tooltip="Ayuda"
+              >
+                <Link href="/ayuda">
+                  <LifeBuoy />
+                  <span>Ayuda</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
          <Separator className="bg-sidebar-border" />
         <div className="p-4">
             <p className="text-xs text-sidebar-foreground/70 text-center">© 2024</p>
