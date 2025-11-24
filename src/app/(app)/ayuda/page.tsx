@@ -26,17 +26,15 @@ import {
   AlertTriangle,
   ServerCrash,
   FileTerminal,
-  Badge,
   CheckCircle,
-  XCircle,
-  Loader2,
   Ban,
   GitBranch,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge as BadgeUI } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
 
 // --- Helper Functions ---
 const normalizeText = (text: string | null | undefined): string => {
