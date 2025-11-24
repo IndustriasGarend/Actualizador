@@ -311,18 +311,17 @@ export default function HelpPage() {
                         </ul>
                     </li>
                     <li>
-                        <strong>Ejecutar el Instalador como Administrador:</strong>
+                        <strong>Ejecutar el Instalador (¡Más fácil!):</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>Abre una consola de <strong>PowerShell como Administrador</strong>.</li>
-                            <li>Navega hasta la carpeta donde descomprimiste los archivos (ej. `cd C:\\SoftlandUpdaterAgent`).</li>
-                            <li>Ejecuta `Set-ExecutionPolicy Unrestricted -Force` para permitir la ejecución de scripts.</li>
-                            <li>Ejecuta el instalador: `.\\install-service.ps1`.</li>
+                            <li>Navega hasta la carpeta donde descomprimiste los archivos.</li>
+                            <li>Haz **doble clic** en el archivo `install.bat`.</li>
+                            <li>Si aparece una ventana de Control de Cuentas de Usuario (UAC), haz clic en "Sí" para permitir que el script se ejecute como Administrador.</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Ingresar Credenciales (¡Paso Crucial!):</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>El script te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\\admin.softland`).</li>
+                             <li>Una vez que el script se esté ejecutando en la consola, te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\\admin.softland`).</li>
                              <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.** Son almacenadas de forma segura por el sistema operativo.</li>
                         </ul>
                     </li>
@@ -360,7 +359,7 @@ export default function HelpPage() {
                         El servidor analiza los datos y decide qué hacer, siguiendo un orden de prioridad estricto:
                          <ol className="list-decimal space-y-2 pl-5 mt-2">
                              <li><strong>Auto-Actualización del Agente:</strong> Si la versión del agente es antigua, el servidor ordena una auto-actualización. Esta es la máxima prioridad.</li>
-                             <li><strong>Cancelación de Tarea:</strong> Si una tarea activa fue cancelada manualmente, el servidor ordena detenerla.</li>
+                             <li><strong>Cancelación de Tarea:</strong> Si una tarea activa fue cancelada manually, el servidor ordena detenerla.</li>
                              <li><strong>Actualización de Softland:</strong> Si hay una actualización de Softland pendiente, el servidor envía la orden.</li>
                              <li><strong>Ninguna Tarea:</strong> Si no hay nada que hacer, el agente se pone en espera.</li>
                          </ol>

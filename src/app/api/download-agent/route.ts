@@ -22,9 +22,12 @@ export async function GET(request: Request) {
         // Leer los templates de los scripts
         const agentTemplatePath = path.join(process.cwd(), 'scripts', 'agent.ps1.template');
         const installTemplatePath = path.join(process.cwd(), 'scripts', 'install-service.ps1.template');
+        const installBatPath = path.join(process.cwd(), 'scripts', 'install.bat');
+
 
         const agentScriptTemplate = await fs.readFile(agentTemplatePath, 'utf-8');
         const installScriptTemplate = await fs.readFile(installTemplatePath, 'utf-8');
+        const installBatContent = await fs.readFile(installBatPath, 'utf-8');
 
         // Reemplazar los placeholders en los scripts
         const agentScriptContent = agentScriptTemplate
@@ -38,12 +41,13 @@ export async function GET(request: Request) {
         const zip = new JSZip();
         zip.file('agent.ps1', agentScriptContent);
         zip.file('install-service.ps1', installScriptContent);
+        zip.file('install.bat', installBatContent);
         
         let zipFilename = `softland-agent-update.zip`;
 
         if (!forUpdate) {
             zipFilename = `softland-agent-${pcName}.zip`;
-            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Abra una consola de PowerShell como Administrador.\n3. Navegue a la carpeta donde copió los archivos.\n4. Ejecute el siguiente comando para permitir la ejecución de scripts: Set-ExecutionPolicy Unrestricted -Force\n5. Ejecute el script de instalación: .\\install-service.ps1\n\nEl servicio 'SoftlandUpdateAgent_${pcName}' será creado e iniciado.`);
+            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la contraseña para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName}' será creado e iniciado.`);
             
             // Insertar la PC en la base de datos si no existe
             const stmt = db.prepare('INSERT OR IGNORE INTO pcs (id, name, alias, location, ip, status) VALUES (?, ?, ?, ?, ?, ?)');
