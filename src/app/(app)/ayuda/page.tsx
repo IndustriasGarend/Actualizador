@@ -321,7 +321,11 @@ export default function HelpPage() {
                     <li>
                         <strong>Ingresar Credenciales (¡Paso Crucial!):</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>Una vez que el script se esté ejecutando en la consola, te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\\admin.softland`).</li>
+                             <li>
+                                <div>
+                                Una vez que el script se esté ejecutando en la consola, te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\\admin.softland`).
+                                </div>
+                             </li>
                              <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.** Son almacenadas de forma segura por el sistema operativo.</li>
                         </ul>
                     </li>
