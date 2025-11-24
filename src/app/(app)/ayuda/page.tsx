@@ -32,7 +32,8 @@ import {
   Trash2,
   ToggleLeft,
   RefreshCw,
-  ToggleRight
+  ToggleRight,
+  Cog
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -167,7 +168,7 @@ export default function HelpPage() {
                 ¡Bienvenido a <strong>Softland Updater</strong>! Este sistema está diseñado para ser tu centro de control centralizado para gestionar y desplegar actualizaciones del software Softland en todas las computadoras de tu empresa de manera eficiente y segura.
                 </p>
                 <p>
-                El objetivo es simple: tener una visión clara del estado de actualización de cada equipo y poder lanzar actualizaciones remotas con un solo clic, sin necesidad de acceder físicamente a cada máquina.
+                El objetivo es simple: tener una visión clara del estado de actualización de cada equipo, obtener un inventario básico de su hardware y poder lanzar actualizaciones remotas con un solo clic, sin necesidad de acceder físicamente a cada máquina.
                 </p>
                  <Alert variant="default" className="mt-4">
                     <AlertTriangle className="h-4 w-4" />
@@ -191,7 +192,7 @@ export default function HelpPage() {
                 <h4 className="font-semibold text-lg pt-2 border-t">Entendiendo la Tarjeta de una PC</h4>
                 <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Nombre de la PC e IP:</strong> Identifican el equipo en la red. La IP es reportada por el agente.
+                        <strong>Nombre de la PC:</strong> Al hacer clic en el nombre, accederás a una vista detallada con el inventario de hardware de ese equipo.
                     </li>
                     <li>
                         <strong>Estado (<Badge variant="secondary" className="text-xs">Badge</Badge>):</strong> La etiqueta de color en la esquina superior derecha te indica el estado actual:
@@ -200,23 +201,27 @@ export default function HelpPage() {
                             <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden de actualización, pero el agente aún no la ha comenzado.</li>
                             <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente está ejecutando una actualización en este momento.</li>
                             <li><Badge variant="destructive">Error</Badge>: Ocurrió un problema durante el último intento de actualización. Revisa el historial para más detalles.</li>
-                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea de actualización fue cancelada manualmente desde el panel.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea de actualización fue cancelada manually desde el panel.</li>
                             <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC está inactiva y no recibirá órdenes de actualización.</li>
                          </ul>
+                    </li>
+                     <li>
+                        <strong>Alias, Ubicación y Usuario Logueado:</strong> Muestran el propietario o alias de la PC, su ubicación física y el último usuario que inició sesión, facilitando su identificación.
                     </li>
                     <li>
                         <strong>Versión App (<GitBranch className="inline h-4 w-4"/>):</strong> Muestra el identificador de la versión de Softland que la PC tiene instalada.
                     </li>
                     <li>
-                        <strong>Versión Agente (<RefreshCw className="inline h-4 w-4"/>):</strong> Muestra la versión del agente instalado. Si aparece en <span className="text-red-500 font-bold">rojo</span>, significa que el agente está desactualizado y necesita ser actualizado. El sistema intentará actualizarlo automáticamente.
+                        <strong>Versión Agente (<RefreshCw className="inline h-4 w-4"/>):</strong> Muestra la versión del agente instalado. Si aparece en <span className="text-red-500 font-bold">rojo</span>, significa que el agente está desactualizado. El sistema intentará actualizarlo automáticamente.
                     </li>
                     <li>
-                        <strong>Botón "Actualizar Ahora":</strong> Este es el disparador principal. Al hacer clic, se crea una tarea de actualización. Si la PC ya tiene la última versión de Softland, el agente lo detectará y simplemente reportará que no necesita actualizarse.
+                        <strong>Botón "Actualizar Ahora":</strong> Este es el disparador principal. Al hacer clic, se crea una tarea de actualización.
                     </li>
                     <li>
                         <strong>Menú de Acciones (⋮):</strong> Este menú te da opciones adicionales:
                          <ul className="list-[square] space-y-2 pl-5 mt-2 text-sm">
-                             <li><span className="inline-flex items-center gap-2"><ToggleLeft className="h-4 w-4"/> <strong>Deshabilitar/Habilitar:</strong></span> Permite marcar una PC como inactiva. No recibirá tareas de actualización.</li>
+                            <li><span className="inline-flex items-center gap-2"><strong>Editar:</strong></span> Permite cambiar el alias y la ubicación de la PC.</li>
+                             <li><span className="inline-flex items-center gap-2"><ToggleLeft className="h-4 w-4"/> <strong>Deshabilitar/Habilitar:</strong></span> Permite marcar una PC como inactiva.</li>
                              <li><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive"/> <strong>Eliminar:</strong></span> Borra permanentemente la PC del sistema.</li>
                          </ul>
                     </li>
@@ -244,16 +249,19 @@ export default function HelpPage() {
                 <h4 className="font-semibold text-lg pt-2 border-t">Parámetros Generales</h4>
                 <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Ruta de archivo de actualización:</strong> La ruta de red completa (UNC Path) donde el agente buscará el archivo comprimido con la actualización (ej. `\\servidor\updates\update.7z`).
+                        <strong>Ruta de archivo de actualización:</strong> La ruta de red completa (UNC Path) donde el agente buscará el archivo comprimido con la actualización (ej. `\\\\servidor\\updates\\update.7z`).
                     </li>
                      <li>
-                        <strong>Directorio de instalación de Softland:</strong> La ruta local en las PCs cliente donde está instalado Softland (ej. `C:\SoftlandERP`).
+                        <strong>Directorio de instalación de Softland:</strong> La ruta local en las PCs cliente donde está instalado Softland (ej. `C:\\SoftlandERP`).
                     </li>
                      <li>
                         <strong>Nombres de los servicios:</strong> Define los servicios de Windows que deben detenerse antes de actualizar. **Puedes listar varios servicios separándolos por comas** (ej: `Servicio1,Servicio POS`).
                     </li>
                      <li>
-                        <strong>Usuario Administrador:</strong> Define la cuenta de usuario con la que se debe instalar el servicio del agente. Es crucial que esta cuenta tenga permisos de administrador local en la PC y acceso a la ruta de red. El formato debe ser `DOMINIO\usuario` (ej. `ING\admin.softland`).
+                        <strong>Rutas para variable de entorno PATH:</strong> Permite añadir rutas al PATH del sistema de las PCs cliente de forma centralizada. Separa cada ruta con un punto y coma (;). El agente se asegurará de no añadir rutas duplicadas.
+                    </li>
+                     <li>
+                        <strong>Usuario Administrador:</strong> Define la cuenta de usuario con la que se debe instalar el servicio del agente. Es crucial que esta cuenta tenga permisos de administrador local en la PC y acceso a la ruta de red. El formato debe ser `DOMINIO\\usuario` (ej. `ING\\admin.softland`).
                     </li>
                 </ul>
 
@@ -263,7 +271,7 @@ export default function HelpPage() {
                         Esta herramienta te permite agregar muchos equipos a la vez.
                         <ol className="list-decimal space-y-2 pl-5 mt-2">
                             <li>Prepara un archivo de texto con extensión `.csv`.</li>
-                            <li>En cada línea, escribe el ID único de la PC, una coma, y el nombre de la PC. No incluyas encabezados. Ejemplo: `pc-01,CAJA-01`.</li>
+                            <li>En cada línea, escribe el ID único, nombre, alias y ubicación de la PC, separados por comas. No incluyas encabezados. Ejemplo: `pc-01,CAJA-01,Juan Perez,Tienda Principal`.</li>
                             <li>Sube el archivo y haz clic en "Importar PCs".</li>
                         </ol>
                     </li>
@@ -272,7 +280,7 @@ export default function HelpPage() {
                 <h4 className="font-semibold text-lg pt-2 border-t">Descargar Agente (<HardDriveDownload className="inline h-4 w-4"/>)</h4>
                  <ul className="list-disc space-y-3 pl-6">
                     <li>Esta es la herramienta para generar el paquete de instalación para una nueva PC.</li>
-                    <li>Ingresa un **ID único** y un **Nombre** para la PC que quieres añadir.</li>
+                    <li>Ingresa un **ID único**, un **Nombre**, y opcionalmente el **Alias** y **Ubicación** para la PC que quieres añadir.</li>
                     <li>Haz clic en "Descargar Paquete (.zip)". Esto generará un archivo ZIP con todo lo necesario para instalar el agente en la PC cliente.</li>
                  </ul>
             </div>
@@ -293,28 +301,28 @@ export default function HelpPage() {
                         <strong>Generar y Descargar el Paquete:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>En el panel de control, ve a <strong>Configuración &gt; Descargar Agente</strong>.</li>
-                            <li>Ingresa el ID y Nombre para la nueva PC y descarga el archivo `.zip`.</li>
+                            <li>Ingresa los datos para la nueva PC y descarga el archivo `.zip`.</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Preparar la PC Cliente:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>Copia el archivo `.zip` a la PC cliente y descomprímelo en una ubicación permanente (ej. `C:\SoftlandUpdaterAgent`).</li>
+                            <li>Copia el archivo `.zip` a la PC cliente y descomprímelo en una ubicación permanente (ej. `C:\\SoftlandUpdaterAgent`).</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Ejecutar el Instalador como Administrador:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>Abre una consola de <strong>PowerShell como Administrador</strong>.</li>
-                            <li>Navega hasta la carpeta donde descomprimiste los archivos (ej. `cd C:\SoftlandUpdaterAgent`).</li>
+                            <li>Navega hasta la carpeta donde descomprimiste los archivos (ej. `cd C:\\SoftlandUpdaterAgent`).</li>
                             <li>Ejecuta `Set-ExecutionPolicy Unrestricted -Force` para permitir la ejecución de scripts.</li>
-                            <li>Ejecuta el instalador: `.\install-service.ps1`.</li>
+                            <li>Ejecuta el instalador: `.\\install-service.ps1`.</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Ingresar Credenciales (¡Paso Crucial!):</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>El script te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\admin.softland`).</li>
+                             <li>El script te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\\admin.softland`).</li>
                              <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.** Son almacenadas de forma segura por el sistema operativo.</li>
                         </ul>
                     </li>
@@ -323,37 +331,58 @@ export default function HelpPage() {
                     <CheckCircle className="h-4 w-4" />
                     <AlertTitle>¡Instalación Completa!</AlertTitle>
                     <AlertDescription>
-                        Si todo salió bien, el script confirmará que el servicio (ej. `SoftlandUpdateAgent_CAJA-01`) fue creado e iniciado. La nueva PC aparecerá automáticamente en el panel de control. El servicio ahora buscará y desinstalará versiones antiguas del agente antes de iniciar, garantizando que solo la última versión esté en ejecución.
+                        Si todo salió bien, el script confirmará que el servicio (ej. `SoftlandUpdateAgent_CAJA-01`) fue creado e iniciado. La nueva PC aparecerá automáticamente en el panel de control. El script de instalación ahora es inteligente: buscará y desinstalará versiones antiguas del agente antes de instalar la nueva, garantizando que solo la última versión esté en ejecución.
                     </AlertDescription>
                 </Alert>
             </div>
         )
     },
     {
-        title: "Auto-Actualización del Agente",
-        icon: <RefreshCw className="mr-4 h-6 w-6 text-orange-500" />,
+        title: "Auto-Actualización del Agente y Lógica de Funcionamiento",
+        icon: <Cog className="mr-4 h-6 w-6 text-orange-500" />,
         content: (
             <div className="space-y-4">
                 <p>
-                Para mantener el sistema de gestión eficiente, el propio agente tiene la capacidad de actualizarse a sí mismo.
+                Para mantener el sistema de gestión eficiente, el propio agente tiene la capacidad de actualizarse a sí mismo y sigue una lógica de operación clara.
                 </p>
-                <h4 className="font-semibold text-lg pt-2 border-t">¿Cómo funciona?</h4>
+                <h4 className="font-semibold text-lg pt-2 border-t">Paso 1: Recolección de Datos y Comunicación</h4>
                  <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Detección de Versión:</strong> Cada vez que un agente se comunica con el servidor, reporta su versión actual. El servidor la compara con la última versión disponible.
+                        El agente inicia y recolecta información clave: su propia versión, la IP actual de la máquina, el usuario con sesión activa y un inventario básico de hardware.
                     </li>
                      <li>
-                        <strong>Orden de Auto-Actualización:</strong> Si el servidor detecta que el agente está desactualizado (lo verás en <span className="text-red-500 font-bold">rojo</span> en el panel), su primera instrucción para el agente será que se auto-actualice, ignorando cualquier otra tarea.
+                        Envía toda esta información al servidor para solicitar instrucciones.
+                    </li>
+                </ul>
+                 <h4 className="font-semibold text-lg pt-2 border-t">Paso 2: Recepción y Priorización de Órdenes</h4>
+                 <ul className="list-disc space-y-3 pl-6">
+                    <li>
+                        El servidor analiza los datos y decide qué hacer, siguiendo un orden de prioridad estricto:
+                         <ol className="list-decimal space-y-2 pl-5 mt-2">
+                             <li><strong>Auto-Actualización del Agente:</strong> Si la versión del agente es antigua, el servidor ordena una auto-actualización. Esta es la máxima prioridad.</li>
+                             <li><strong>Cancelación de Tarea:</strong> Si una tarea activa fue cancelada manualmente, el servidor ordena detenerla.</li>
+                             <li><strong>Actualización de Softland:</strong> Si hay una actualización de Softland pendiente, el servidor envía la orden.</li>
+                             <li><strong>Ninguna Tarea:</strong> Si no hay nada que hacer, el agente se pone en espera.</li>
+                         </ol>
+                    </li>
+                </ul>
+                <h4 className="font-semibold text-lg pt-2 border-t">Paso 3: Ejecución de la Tarea</h4>
+                 <ul className="list-disc space-y-3 pl-6">
+                    <li>
+                        <strong>Si la orden es auto-actualizar:</strong> El agente antiguo descarga el nuevo paquete, ejecuta el nuevo instalador (que limpia versiones viejas) y luego se detiene. Este proceso es automático y garantiza que los agentes se mantengan al día sin intervención manual.
                     </li>
                      <li>
-                        <strong>Proceso de Reemplazo:</strong> El agente antiguo descargará el nuevo paquete de instalación, lo ejecutará en un segundo plano, y el nuevo instalador se encargará de detener y reemplazar el servicio antiguo por el nuevo antes de terminar el proceso.
+                        <strong>Si la orden es actualizar Softland:</strong> El agente ejecuta el proceso de actualización paso a paso, enviando logs al servidor sobre el progreso y resultado de cada etapa.
+                    </li>
+                     <li>
+                        <strong>Si no hay tareas:</strong> El agente espera un intervalo de tiempo y vuelve a empezar el ciclo desde el Paso 1.
                     </li>
                 </ul>
                 <Alert variant="default" className="mt-4">
                     <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>Proceso Automático</AlertTitle>
+                    <AlertTitle>Proceso 100% Automático</AlertTitle>
                     <AlertDescription>
-                        No necesitas hacer nada. Si ves una versión de agente en rojo, el sistema intentará corregirlo en el próximo ciclo de comunicación del agente. Solo necesitas asegurarte de que el servidor tenga la última versión de los scripts del agente.
+                        No necesitas hacer nada para mantener los agentes actualizados. Si ves una versión de agente en rojo en el panel, el sistema lo corregirá automáticamente en el próximo ciclo de comunicación.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -373,7 +402,7 @@ export default function HelpPage() {
                         <strong>Éxito:</strong> La operación se completó correctamente.
                     </li>
                      <li>
-                        <strong>Fallo:</strong> Ocurrió un error. El mensaje en el log te dará una pista crucial sobre qué salió mal (ej. "Acceso denegado a C:\SoftlandERP\sl.dll", "No se pudo detener el servicio 'Servicio1'").
+                        <strong>Fallo:</strong> Ocurrió un error. El mensaje en el log te dará una pista crucial sobre qué salió mal (ej. "Acceso denegado a C:\\SoftlandERP\\sl.dll", "No se pudo detener el servicio 'Servicio1'").
                     </li>
                      <li>
                         <strong>Omitido:</strong> El agente determinó que la actualización no era necesaria porque la PC ya tenía la última versión.
