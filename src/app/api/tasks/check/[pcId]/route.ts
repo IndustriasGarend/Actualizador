@@ -1,6 +1,22 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { LATEST_AGENT_VERSION } from '@/lib/data';
+import { LATEST_AGENT_VERSION, defaultConfig } from '@/lib/data';
+import type { SystemConfig } from '@/lib/types';
+
+function getSystemConfig(): SystemConfig {
+  const stmt = db.prepare('SELECT * FROM settings');
+  const rows = stmt.all() as { key: string; value: string }[];
+  
+  const config = rows.reduce((acc, row) => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    acc[row.key] = row.value;
+    return acc;
+  }, {});
+
+  return { ...defaultConfig, ...config };
+}
+
 
 export async function POST(
   request: Request,
@@ -10,6 +26,8 @@ export async function POST(
   const { agentVersion } = await request.json();
 
   try {
+    const config = getSystemConfig();
+
     // 1. Detección de agente desactualizado (MÁXIMA PRIORIDAD)
     if (agentVersion !== LATEST_AGENT_VERSION) {
       return NextResponse.json({ task: 'actualizar_agente' });
@@ -32,7 +50,18 @@ export async function POST(
     const task = stmt.get(pcId);
 
     if (task) {
-      return NextResponse.json({ task: 'actualizar', taskId: task.id });
+      // Devolver la tarea junto con la configuración actual
+      return NextResponse.json({ 
+        task: 'actualizar', 
+        taskId: task.id,
+        config: {
+          updateFilePath: config.updateFilePath,
+          localUpdateDir: config.localUpdateDir,
+          softlandInstallDir: config.softlandInstallDir,
+          serviceName: config.serviceName,
+          environmentPath: config.environmentPath,
+        }
+      });
     }
 
     // Si no hay tareas pendientes, de cancelación ni de auto-actualización, no hacer nada.

@@ -1,120 +1,264 @@
-# Softland Updater Agent
-# Este script se ejecuta en cada PC cliente y se comunica con el servidor central.
+# Versión del Agente
+$global:AgentVersion = "1.1"
 
-# --- Configuración ---
-$pcId = "__PC_ID__"
-$serverUrl = "__SERVER_URL__"
-$checkTaskUrl = "$serverUrl/api/tasks/check/$pcId"
-$logUrl = "$serverUrl/api/tasks/log"
-$agentDir = $PSScriptRoot
-$localVersionFile = Join-Path $agentDir "version.txt"
+# --- Configuración Inicial ---
+$global:ServerUrl = "__SERVER_URL__"
+$global:PCId = "__PC_ID__"
+$global:PCName = $env:COMPUTERNAME
+$global:PollingIntervalSeconds = 60 # Tiempo de espera entre cada sondeo al servidor
 
-# --- Funciones ---
+# --- Funciones de Utilidad ---
 
-# Función para enviar logs al servidor
+# Envía logs y estado al servidor
 function Send-Log {
-    param(
+    param (
         [string]$Action,
         [string]$Status,
-        [string]$Message,
-        [string]$VersionId
+        [string]$Message = "",
+        [string]$VersionId = "",
+        [int]$TaskId = -1,
+        [string]$AgentVersion = "",
+        [string]$Ip = "",
+        [string]$LoggedUser = "",
+        [object]$HardwareInfo = $null
     )
-    
-    $pcName = $env:COMPUTERNAME
-    $body = @{
-        pcId = $pcId
-        pcName = $pcName
-        action = $Action
-        status = $Status
-        message = $Message
-        versionId = $VersionId
-    } | ConvertTo-Json
+
+    $payload = @{
+        pcId         = $global:PCId
+        pcName       = $global:PCName
+        action       = $Action
+        status       = $Status
+        message      = $Message
+        versionId    = $VersionId
+        taskId       = if ($TaskId -eq -1) { $null } else { $TaskId }
+        agentVersion = if ([string]::IsNullOrEmpty($AgentVersion)) { $null } else { $AgentVersion }
+        ip           = if ([string]::IsNullOrEmpty($Ip)) { $null } else { $Ip }
+        loggedUser   = if ([string]::IsNullOrEmpty($LoggedUser)) { $null } else { $LoggedUser }
+        hardwareInfo = $HardwareInfo
+    } | ConvertTo-Json -Depth 5
 
     try {
-        Invoke-RestMethod -Uri $logUrl -Method Post -Body $body -ContentType 'application/json' -ErrorAction Stop
-    } catch {
-        Write-Warning "No se pudo enviar el log al servidor: $($_.Exception.Message)"
+        Invoke-RestMethod -Uri "$($global:ServerUrl)/api/tasks/log" -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 30
     }
+    catch {
+        Write-Host "Error al enviar log: $($_.Exception.Message)"
+    }
+}
+
+# --- Funciones de Inventario ---
+function Get-HardwareInfo {
+    try {
+        $computerInfo = Get-ComputerInfo -Property 'OsName', 'OsVersion', 'OsOperatingSystemSKU'
+        $cpuInfo = Get-WmiObject -Class Win32_Processor
+        $memInfo = Get-WmiObject -Class Win32_ComputerSystem
+        $diskInfo = Get-PhysicalDisk | Select-Object -Property @{N="model"; E={$_.Model}}, @{N="size"; E={[math]::Round($_.Size / 1GB)}}
+
+        return @{
+            osName = $computerInfo.OsName
+            osVersion = $computerInfo.OsVersion
+            cpuModel = $cpuInfo.Name
+            cpuCores = $cpuInfo.NumberOfLogicalProcessors
+            totalMemory = [math]::Round($memInfo.TotalPhysicalMemory / 1MB)
+            disks = $diskInfo | ConvertTo-Json -Compress
+        }
+    }
+    catch {
+        Write-Host "Error obteniendo información de hardware: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+
+# --- Funciones del Agente ---
+
+# Función para añadir rutas al PATH del sistema si no existen
+function Update-SystemEnvironmentPath {
+    param(
+        [string]$PathsToAdd
+    )
+    if ([string]::IsNullOrEmpty($PathsToAdd)) {
+        return
+    }
+
+    try {
+        $envPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+        $currentPath = (Get-ItemProperty -Path $envPath -Name Path).Path
+        $currentPathArray = $currentPath.Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.TrimEnd('\') }
+
+        $pathsToAddArray = $PathsToAdd.Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.TrimEnd('\') }
+
+        $newPaths = @()
+        foreach ($path in $pathsToAddArray) {
+            if ($currentPathArray -notcontains $path) {
+                $newPaths += $path
+            }
+        }
+
+        if ($newPaths.Count -gt 0) {
+            $newPathString = ($currentPathArray + $newPaths) -join ';'
+            Set-ItemProperty -Path $envPath -Name Path -Value $newPathString
+            Send-Log -Action "Actualización de PATH" -Status "Éxito" -Message "Se añadieron $($newPaths.Count) nuevas rutas a la variable PATH del sistema."
+        }
+    }
+    catch {
+        $errorMessage = "Error al actualizar la variable de entorno PATH: $($_.Exception.Message)"
+        Write-Host $errorMessage
+        Send-Log -Action "Actualización de PATH" -Status "Fallo" -Message $errorMessage
+    }
+}
+
+
+# Función principal para procesar una tarea de actualización de Softland
+function Process-UpdateTask {
+    param (
+        [int]$TaskId,
+        [object]$Config
+    )
+
+    $updateFilePath = $Config.updateFilePath
+    $localUpdateDir = $Config.localUpdateDir
+    $softlandInstallDir = $Config.softlandInstallDir
+    $serviceNames = $Config.serviceName.Split(',') | ForEach-Object { $_.Trim() }
+
+    # 1. Verificar si ya tiene la última versión
+    $versionId = (Split-Path -Leaf $updateFilePath)
+    $versionFilePath = Join-Path $softlandInstallDir "version.txt"
+    if (Test-Path $versionFilePath) {
+        $currentVersion = Get-Content $versionFilePath
+        if ($currentVersion -eq $versionId) {
+            Send-Log -Action "Versión ya actualizada" -Status "Éxito" -Message "La PC ya tiene la versión $versionId." -VersionId $versionId -TaskId $TaskId
+            return
+        }
+    }
+
+    # 2. Detener servicios
+    foreach ($serviceName in $serviceNames) {
+        if (Get-Service $serviceName -ErrorAction SilentlyContinue) {
+            Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 5 # Dar tiempo a que se detenga
+            $service = Get-Service $serviceName
+            if ($service.Status -ne 'Stopped') {
+                Send-Log -Action "Detener servicio" -Status "Fallo" -Message "No se pudo detener el servicio '$serviceName'." -TaskId $TaskId
+                return
+            }
+        }
+    }
+
+    # 3. Crear directorio temporal
+    if (Test-Path $localUpdateDir) {
+        Remove-Item -Path $localUpdateDir -Recurse -Force
+    }
+    New-Item -Path $localUpdateDir -ItemType Directory
+
+    # 4. Extraer archivos (asumiendo 7-Zip en el PATH del sistema)
+    try {
+        # Necesitas 7-Zip instalado y en el PATH del sistema en las PCs cliente.
+        7z.exe x "$updateFilePath" -o"$localUpdateDir" -y | Out-Null
+    }
+    catch {
+        Send-Log -Action "Extracción de archivos" -Status "Fallo" -Message "Error al extraer '$updateFilePath'. Asegúrate de que 7-Zip esté instalado y en el PATH. Error: $($_.Exception.Message)" -TaskId $TaskId
+        return
+    }
+
+    # 5. Copiar archivos
+    try {
+        Copy-Item -Path "$($localUpdateDir)\*" -Destination $softlandInstallDir -Recurse -Force
+    }
+    catch {
+        Send-Log -Action "Copiado de archivos" -Status "Fallo" -Message "Error al copiar archivos a '$softlandInstallDir'. Error: $($_.Exception.Message)" -TaskId $TaskId
+        return
+    }
+
+    # 6. Registrar versión
+    $versionId | Out-File -FilePath $versionFilePath -Encoding utf8
+
+    # 7. Limpiar
+    Remove-Item -Path $localUpdateDir -Recurse -Force
+
+    # 8. Reporte final
+    Send-Log -Action "Actualización completada" -Status "Éxito" -Message "Proceso de actualización finalizado." -VersionId $versionId -TaskId $TaskId
+}
+
+# Función para auto-actualizar el agente
+function Process-AgentUpdate {
+    $updatePackagePath = Join-Path $env:TEMP "softland-agent-update.zip"
+    
+    # Descargar el nuevo paquete de agente
+    try {
+        Invoke-WebRequest -Uri "$($global:ServerUrl)/api/download-agent?forUpdate=true" -OutFile $updatePackagePath
+    } catch {
+        Send-Log -Action "Auto-actualización del agente" -Status "Fallo" -Message "No se pudo descargar el nuevo paquete de agente."
+        return
+    }
+
+    # Extraer y ejecutar el nuevo instalador
+    $extractPath = Join-Path $env:TEMP "softland-agent-update"
+    if (Test-Path $extractPath) {
+        Remove-Item -Path $extractPath -Recurse -Force
+    }
+    Expand-Archive -Path $updatePackagePath -DestinationPath $extractPath -Force
+    
+    $installerScript = Join-Path $extractPath "install-service.ps1"
+    
+    if (Test-Path $installerScript) {
+        # Ejecuta el nuevo instalador. El nuevo instalador se encargará de
+        # detener y eliminar el servicio antiguo antes de instalar el nuevo.
+        # Se ejecuta en un nuevo proceso para permitir que este script termine.
+        Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$installerScript`"" -Verb RunAs
+        
+        # El agente antiguo termina su ejecución aquí.
+        Send-Log -Action "Auto-actualización del agente" -Status "Éxito" -Message "Nuevo instalador del agente ejecutado. El servicio se reiniciará con la nueva versión."
+        Exit
+    } else {
+        Send-Log -Action "Auto-actualización del agente" -Status "Fallo" -Message "El paquete de agente descargado no contiene 'install-service.ps1'."
+    }
+}
+
+# Función para cancelar una tarea
+function Process-CancelTask {
+    param([int]$TaskId)
+    Send-Log -Action "Tarea cancelada" -Status "Cancelado" -Message "La tarea fue cancelada desde el panel." -TaskId $TaskId
 }
 
 # --- Bucle Principal ---
 while ($true) {
+    $currentIp = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.PrefixOrigin -eq 'Dhcp' -or $_.PrefixOrigin -eq 'Manual' } | Select-Object -First 1).IPAddress
+    $currentUser = (Get-WmiObject -ClassName Win32_ComputerSystem).UserName
+    $hardwareInfo = Get-HardwareInfo
+
+    # Reportar estado y versión, y verificar si hay tareas
     try {
-        # 1. Verificar si hay tareas pendientes
-        Write-Host "Verificando tareas en $checkTaskUrl"
-        $response = Invoke-RestMethod -Uri $checkTaskUrl -Method Get -ErrorAction Stop
+        $payload = @{ agentVersion = $global:AgentVersion } | ConvertTo-Json
+        $response = Invoke-RestMethod -Uri "$($global:ServerUrl)/api/tasks/check/$($global:PCId)" -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 30
         
-        if ($response.task -eq 'actualizar') {
-            Send-Log -Action "Inicio de actualización" -Status "Éxito" -Message "Tarea de actualización recibida (ID: $($response.taskId))."
-            
-            # --- Aquí comienza la lógica de la actualización ---
+        # Reportar estado general periódicamente
+        Send-Log -Action "Reporte de estado" -Status "Éxito" -Message "Agente activo." -AgentVersion $global:AgentVersion -Ip $currentIp -LoggedUser $currentUser -HardwareInfo $hardwareInfo
 
-            # Obtener configuración del servidor (simulado por ahora, se leería de un config.json o similar)
-            $config = @{
-                updateFilePath = "\\\\servidor\\actualizaciones\\softland_update_latest.7z"
-                versionFilePath = "\\\\servidor\\actualizaciones\\version.txt"
-                localUpdateDir = "C:\\ActualizacionSoftland"
-                softlandInstallDir = "C:\\Softland"
-                serviceName = "Softland POS Sincronización"
+        # Procesar tarea recibida
+        switch ($response.task) {
+            "actualizar_agente" {
+                Write-Host "Orden recibida: Actualizar Agente."
+                Process-AgentUpdate
             }
-
-            # 2. Comprobar la versión del software
-            $serverVersion = ""
-            $localVersion = ""
-
-            try {
-                if (Test-Path $config.versionFilePath) {
-                    $serverVersion = Get-Content $config.versionFilePath -Raw
-                } else {
-                    Send-Log -Action "Comprobación de versión" -Status "Fallo" -Message "No se encontró el archivo de versión en el servidor: $($config.versionFilePath)"
-                    # Continuar sin comprobación de versión si no se encuentra
-                }
-                
-                if (Test-Path $localVersionFile) {
-                    $localVersion = Get-Content $localVersionFile -Raw
-                }
-            } catch {
-                 Send-Log -Action "Comprobación de versión" -Status "Fallo" -Message "Error al leer archivos de versión: $($_.Exception.Message)"
+            "actualizar" {
+                Write-Host "Orden recibida: Actualizar Softland (Tarea $($response.taskId))."
+                Update-SystemEnvironmentPath -PathsToAdd $response.config.environmentPath
+                Process-UpdateTask -TaskId $response.taskId -Config $response.config
             }
-
-            if ($serverVersion -ne "" -and $serverVersion -eq $localVersion) {
-                Send-Log -Action "Comprobación de versión" -Status "Omitido" -Message "La PC ya tiene la última versión ($localVersion)." -VersionId $localVersion
-                Start-Sleep -Seconds 60
-                continue
+            "cancelar" {
+                 Write-Host "Orden recibida: Cancelar Tarea $($response.taskId)."
+                 Process-CancelTask -TaskId $response.taskId
             }
-
-            Send-Log -Action "Comprobación de versión" -Status "Éxito" -Message "Se procederá a actualizar de la versión '$localVersion' a la '$serverVersion'."
-
-            # (Los pasos de actualización continúan aquí...)
-            # ...
-            # ... simulación de pasos ...
-            Start-Sleep -Seconds 5
-            Send-Log -Action "Deteniendo servicio" -Status "Éxito" -Message "Servicio '$($config.serviceName)' detenido."
-            
-            Start-Sleep -Seconds 5
-            Send-Log -Action "Copiando archivos" -Status "Éxito" -Message "Archivos copiados desde $($config.updateFilePath)."
-
-            Start-Sleep -Seconds 10
-            Send-Log -Action "Extrayendo archivos" -Status "Éxito" -Message "Archivos extraídos en $($config.softlandInstallDir)."
-            
-            # Al finalizar con éxito
-            Send-Log -Action "Actualización completada" -Status "Éxito" -Message "El sistema se ha actualizado a la versión $serverVersion." -VersionId $serverVersion
-            
-            # Guardar la nueva versión localmente
-            try {
-                Set-Content -Path $localVersionFile -Value $serverVersion
-            } catch {
-                Send-Log -Action "Guardar versión local" -Status "Fallo" -Message "No se pudo escribir el nuevo archivo de versión en $localVersionFile."
+            "ninguna" {
+                # No hay tareas, esperar.
             }
-
-        } else {
-            Write-Host "No hay tareas pendientes."
         }
-    } catch {
-        # Error al conectar con el servidor
-        Write-Warning "No se pudo conectar con el servidor: $($_.Exception.Message)"
     }
-    
-    # Esperar 60 segundos antes de la próxima verificación
-    Start-Sleep -Seconds 60
+    catch {
+        # Error al contactar el servidor
+        Write-Host "No se pudo contactar al servidor: $($_.Exception.Message)"
+    }
+
+    # Esperar para el próximo sondeo
+    Start-Sleep -Seconds $global:PollingIntervalSeconds
 }

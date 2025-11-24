@@ -20,6 +20,7 @@ import type { SystemConfig } from '@/lib/types';
 import { Loader2, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Textarea } from '../ui/textarea';
 
 const formSchema = z.object({
   updateFilePath: z.string().min(1, 'La ruta del archivo es requerida.'),
@@ -28,6 +29,7 @@ const formSchema = z.object({
   serviceName: z.string().min(1, 'El nombre del servicio es requerido.'),
   adminUser: z.string().min(1, 'El usuario administrador es requerido.'),
   adminPass: z.string(),
+  environmentPath: z.string().optional(),
 });
 
 interface ConfigFormProps {
@@ -50,7 +52,6 @@ const HelpTooltip = ({ children }: { children: React.ReactNode }) => (
 
 export function ConfigForm({ initialConfig }: ConfigFormProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,25 +60,32 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSaving(true);
-    // Aquí se guardaría la configuración en la base de datos
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Saving config:', values);
-    toast({
-      title: 'Configuración Guardada',
-      description: 'Los parámetros del sistema se han actualizado correctamente.',
-    });
-    setIsSaving(false);
-  }
-  
-  async function onValidate() {
-    setIsValidating(true);
-    // Aquí se podría validar la conexión a la ruta de red, etc.
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    toast({
-      title: 'Validación Exitosa',
-      description: 'Todos los parámetros de configuración son válidos y accesibles.',
-    });
-    setIsValidating(false);
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'No se pudo guardar la configuración.');
+      }
+
+      toast({
+        title: 'Configuración Guardada',
+        description: 'Los parámetros del sistema se han actualizado correctamente.',
+      });
+
+    } catch (error) {
+       toast({
+        title: 'Error al Guardar',
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -167,6 +175,27 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                 )}
               />
             </div>
+            <div className="space-y-8 pt-4 border-t">
+              <FormField
+                  control={form.control}
+                  name="environmentPath"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center">
+                          Rutas adicionales para variable de entorno PATH
+                          <HelpTooltip>
+                              Pegue aquí las rutas que desea añadir a la variable de entorno PATH del sistema en las PCs cliente. Separe cada ruta con un punto y coma (;). El agente se asegurará de que estas rutas existan y no las duplicará.
+                          </HelpTooltip>
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="C:\\Ruta1;C:\\Ruta2\\SubRuta" className="min-h-[120px] font-mono text-xs" {...field} />
+                      </FormControl>
+                      <FormDescription>Rutas a añadir a la variable PATH del sistema, separadas por punto y coma.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t">
               <FormField
                 control={form.control}
@@ -209,13 +238,9 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={onValidate} disabled={isValidating}>
-                {isValidating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Validar
-              </Button>
               <Button type="submit" disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar
+                Guardar Configuración
               </Button>
           </CardFooter>
         </Card>

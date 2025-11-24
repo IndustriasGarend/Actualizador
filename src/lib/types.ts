@@ -46,4 +46,5 @@ export interface SystemConfig {
     serviceName: string;
     adminUser: string;
     adminPass: string;
+    environmentPath: string;
 }
