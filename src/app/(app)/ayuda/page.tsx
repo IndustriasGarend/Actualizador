@@ -35,7 +35,7 @@ import {
   ToggleRight
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge as BadgeUI } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -194,14 +194,14 @@ export default function HelpPage() {
                         <strong>Nombre de la PC e IP:</strong> Identifican el equipo en la red. La IP es reportada por el agente.
                     </li>
                     <li>
-                        <strong>Estado (<BadgeUI variant="secondary" className="text-xs">Badge</BadgeUI>):</strong> La etiqueta de color en la esquina superior derecha te indica el estado actual:
+                        <strong>Estado (<Badge variant="secondary" className="text-xs">Badge</Badge>):</strong> La etiqueta de color en la esquina superior derecha te indica el estado actual:
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li><BadgeUI className="bg-accent text-accent-foreground">Actualizado</BadgeUI>: La PC tiene la última versión disponible.</li>
-                            <li><BadgeUI variant="secondary">Pendiente</BadgeUI>: Se ha enviado una orden de actualización, pero el agente aún no la ha comenzado.</li>
-                            <li><BadgeUI className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</BadgeUI>: El agente está ejecutando una actualización en este momento.</li>
-                            <li><BadgeUI variant="destructive">Error</BadgeUI>: Ocurrió un problema durante el último intento de actualización. Revisa el historial para más detalles.</li>
-                            <li><BadgeUI className="bg-yellow-500 text-white">Cancelado</BadgeUI>: La tarea de actualización fue cancelada manualmente desde el panel.</li>
-                            <li><BadgeUI className="bg-slate-500 text-white">Deshabilitado</BadgeUI>: La PC está inactiva y no recibirá órdenes de actualización.</li>
+                            <li><Badge className="bg-accent text-accent-foreground">Actualizado</Badge>: La PC tiene la última versión disponible.</li>
+                            <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden de actualización, pero el agente aún no la ha comenzado.</li>
+                            <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente está ejecutando una actualización en este momento.</li>
+                            <li><Badge variant="destructive">Error</Badge>: Ocurrió un problema durante el último intento de actualización. Revisa el historial para más detalles.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea de actualización fue cancelada manualmente desde el panel.</li>
+                            <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC está inactiva y no recibirá órdenes de actualización.</li>
                          </ul>
                     </li>
                     <li>
@@ -333,7 +333,7 @@ export default function HelpPage() {
         title: "Auto-Actualización del Agente",
         icon: <RefreshCw className="mr-4 h-6 w-6 text-orange-500" />,
         content: (
-             <div className="space-y-4">
+            <div className="space-y-4">
                 <p>
                 Para mantener el sistema de gestión eficiente, el propio agente tiene la capacidad de actualizarse a sí mismo.
                 </p>
@@ -363,7 +363,7 @@ export default function HelpPage() {
         title: "Guía del Historial y Solución de Problemas",
         icon: <History className="mr-4 h-6 w-6 text-purple-500" />,
         content: (
-             <div className="space-y-4">
+            <div className="space-y-4">
                 <p>
                 La página de Historial es tu mejor herramienta para entender qué ha sucedido en el sistema y para diagnosticar problemas.
                 </p>
