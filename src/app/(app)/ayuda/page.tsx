@@ -30,7 +30,9 @@ import {
   Ban,
   GitBranch,
   Trash2,
-  ToggleLeft
+  ToggleLeft,
+  RefreshCw,
+  ToggleRight
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge as BadgeUI } from "@/components/ui/badge";
@@ -126,6 +128,34 @@ const HelpSection = ({
 
 export default function HelpPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeItem, setActiveItem] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (searchTerm) {
+        const firstMatch = helpSections.find(section => {
+            const searchTerms = normalizeText(searchTerm).split(" ").filter(Boolean);
+            if (searchTerms.length === 0) return false;
+            const contentString = (title: string, content: React.ReactNode) => {
+                 const getText = (node: React.ReactNode): string => {
+                    if (typeof node === "string") return node;
+                    if (Array.isArray(node)) return node.map(getText).join(" ");
+                    if (typeof node === "object" && node !== null && "props" in node && node.props.children) {
+                        return getText(node.props.children);
+                    }
+                    return "";
+                };
+                return title + " " + getText(content);
+            }
+            const targetText = normalizeText(contentString(section.title, section.content));
+            return searchTerms.every((term) => targetText.includes(term));
+        });
+        setActiveItem(firstMatch?.title);
+    } else {
+        setActiveItem(undefined);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
 
   const helpSections = [
     {
@@ -175,16 +205,19 @@ export default function HelpPage() {
                          </ul>
                     </li>
                     <li>
-                        <strong>Versión (<GitBranch className="inline h-4 w-4"/>):</strong> Muestra el identificador de la versión de software que la PC tiene instalada actualmente.
+                        <strong>Versión App (<GitBranch className="inline h-4 w-4"/>):</strong> Muestra el identificador de la versión de Softland que la PC tiene instalada.
                     </li>
                     <li>
-                        <strong>Botón "Actualizar Ahora":</strong> Este es el disparador principal. Al hacer clic, se crea una tarea de actualización para esa PC. El sistema es inteligente: si la PC ya tiene la última versión, el agente lo detectará y simplemente reportará que no necesita actualizarse.
+                        <strong>Versión Agente (<RefreshCw className="inline h-4 w-4"/>):</strong> Muestra la versión del agente instalado. Si aparece en <span className="text-red-500 font-bold">rojo</span>, significa que el agente está desactualizado y necesita ser actualizado. El sistema intentará actualizarlo automáticamente.
                     </li>
                     <li>
-                        <strong>Menú de Acciones (⋮):</strong> Este menú te da opciones adicionales para gestionar la PC:
+                        <strong>Botón "Actualizar Ahora":</strong> Este es el disparador principal. Al hacer clic, se crea una tarea de actualización. Si la PC ya tiene la última versión de Softland, el agente lo detectará y simplemente reportará que no necesita actualizarse.
+                    </li>
+                    <li>
+                        <strong>Menú de Acciones (⋮):</strong> Este menú te da opciones adicionales:
                          <ul className="list-[square] space-y-2 pl-5 mt-2 text-sm">
-                             <li><span className="inline-flex items-center gap-2"><ToggleLeft className="h-4 w-4"/> <strong>Deshabilitar/Habilitar:</strong></span> Permite activar o desactivar una PC. Una PC deshabilitada no puede recibir tareas de actualización. Es útil para equipos en mantenimiento.</li>
-                             <li><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive"/> <strong>Eliminar:</strong></span> Borra permanentemente la PC y todo su historial del sistema. Úsalo para equipos que ya no forman parte de la red.</li>
+                             <li><span className="inline-flex items-center gap-2"><ToggleLeft className="h-4 w-4"/> <strong>Deshabilitar/Habilitar:</strong></span> Permite marcar una PC como inactiva. No recibirá tareas de actualización.</li>
+                             <li><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive"/> <strong>Eliminar:</strong></span> Borra permanentemente la PC del sistema.</li>
                          </ul>
                     </li>
                 </ul>
@@ -193,7 +226,7 @@ export default function HelpPage() {
                     <ServerCrash className="h-4 w-4" />
                     <AlertTitle>¿No ves ninguna PC?</AlertTitle>
                     <AlertDescription>
-                        Si el panel está vacío, significa que aún no has agregado ninguna PC al sistema. Dirígete a la sección de <strong>Configuración</strong> para aprender cómo hacerlo.
+                        Si el panel está vacío, significa que aún no has agregado ninguna PC. Dirígete a la sección de <strong>Configuración</strong> para aprender cómo hacerlo.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -214,7 +247,7 @@ export default function HelpPage() {
                         <strong>Ruta de archivo de actualización:</strong> La ruta de red completa (UNC Path) donde el agente buscará el archivo comprimido con la actualización (ej. `\\servidor\updates\update.7z`).
                     </li>
                      <li>
-                        <strong>Directorio de instalación de Softland:</strong> La ruta local en las PCs cliente donde está instalado Softland (ej. `C:\SoftlandERP`). El agente usará esta ruta para reemplazar los archivos.
+                        <strong>Directorio de instalación de Softland:</strong> La ruta local en las PCs cliente donde está instalado Softland (ej. `C:\SoftlandERP`).
                     </li>
                      <li>
                         <strong>Nombres de los servicios:</strong> Define los servicios de Windows que deben detenerse antes de actualizar. **Puedes listar varios servicios separándolos por comas** (ej: `Servicio1,Servicio POS`).
@@ -231,7 +264,7 @@ export default function HelpPage() {
                         <ol className="list-decimal space-y-2 pl-5 mt-2">
                             <li>Prepara un archivo de texto con extensión `.csv`.</li>
                             <li>En cada línea, escribe el ID único de la PC, una coma, y el nombre de la PC. No incluyas encabezados. Ejemplo: `pc-01,CAJA-01`.</li>
-                            <li>Sube el archivo usando el selector y haz clic en "Importar PCs". El sistema añadirá todos los equipos nuevos a la base de datos, omitiendo los que ya existan.</li>
+                            <li>Sube el archivo y haz clic en "Importar PCs".</li>
                         </ol>
                     </li>
                 </ul>
@@ -239,8 +272,8 @@ export default function HelpPage() {
                 <h4 className="font-semibold text-lg pt-2 border-t">Descargar Agente (<HardDriveDownload className="inline h-4 w-4"/>)</h4>
                  <ul className="list-disc space-y-3 pl-6">
                     <li>Esta es la herramienta para generar el paquete de instalación para una nueva PC.</li>
-                    <li>Ingresa un **ID único** y un **Nombre** para la PC que quieres añadir. Estos datos se incrustarán en el agente.</li>
-                    <li>Haz clic en "Descargar Paquete (.zip)". Esto generará y descargará un archivo ZIP que contiene todo lo necesario para instalar el agente en la PC cliente.</li>
+                    <li>Ingresa un **ID único** y un **Nombre** para la PC que quieres añadir.</li>
+                    <li>Haz clic en "Descargar Paquete (.zip)". Esto generará un archivo ZIP con todo lo necesario para instalar el agente en la PC cliente.</li>
                  </ul>
             </div>
         )
@@ -267,14 +300,13 @@ export default function HelpPage() {
                         <strong>Preparar la PC Cliente:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>Copia el archivo `.zip` a la PC cliente y descomprímelo en una ubicación permanente (ej. `C:\SoftlandUpdaterAgent`).</li>
-                            <li>El contenido será: `agent.ps1`, `install-service.ps1` y un `README.txt`.</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Ejecutar el Instalador como Administrador:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>Abre una consola de **PowerShell como Administrador**.</li>
-                            <li>Navega hasta la carpeta donde descomprimiste los archivos. (ej. `cd C:\SoftlandUpdaterAgent`).</li>
+                            <li>Abre una consola de <strong>PowerShell como Administrador</strong>.</li>
+                            <li>Navega hasta la carpeta donde descomprimiste los archivos (ej. `cd C:\SoftlandUpdaterAgent`).</li>
                             <li>Ejecuta `Set-ExecutionPolicy Unrestricted -Force` para permitir la ejecución de scripts.</li>
                             <li>Ejecuta el instalador: `.\install-service.ps1`.</li>
                         </ul>
@@ -283,7 +315,7 @@ export default function HelpPage() {
                         <strong>Ingresar Credenciales (¡Paso Crucial!):</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                              <li>El script te pedirá un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuración (ej. `ING\admin.softland`).</li>
-                             <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.** Son almacenadas de forma segura por el sistema operativo para el servicio.</li>
+                             <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningún archivo de texto plano.** Son almacenadas de forma segura por el sistema operativo.</li>
                         </ul>
                     </li>
                 </ol>
@@ -291,51 +323,69 @@ export default function HelpPage() {
                     <CheckCircle className="h-4 w-4" />
                     <AlertTitle>¡Instalación Completa!</AlertTitle>
                     <AlertDescription>
-                        Si todo salió bien, el script confirmará que el servicio (ej. `SoftlandUpdateAgent_CAJA-01`) fue creado e iniciado. La nueva PC aparecerá automáticamente en el panel de control en unos minutos con el estado "Pendiente".
+                        Si todo salió bien, el script confirmará que el servicio (ej. `SoftlandUpdateAgent_CAJA-01`) fue creado e iniciado. La nueva PC aparecerá automáticamente en el panel de control. El servicio ahora buscará y desinstalará versiones antiguas del agente antes de iniciar, garantizando que solo la última versión esté en ejecución.
                     </AlertDescription>
                 </Alert>
             </div>
         )
     },
-     {
-        title: "Guía del Historial de Actualizaciones",
-        icon: <History className="mr-4 h-6 w-6 text-purple-500" />,
+    {
+        title: "Auto-Actualización del Agente",
+        icon: <RefreshCw className="mr-4 h-6 w-6 text-orange-500" />,
         content: (
              <div className="space-y-4">
                 <p>
-                Esta sección es tu bitácora de todo lo que ha sucedido en el sistema. Es invaluable para auditar y diagnosticar problemas.
+                Para mantener el sistema de gestión eficiente, el propio agente tiene la capacidad de actualizarse a sí mismo.
                 </p>
-                <ul className="list-disc space-y-3 pl-6">
+                <h4 className="font-semibold text-lg pt-2 border-t">¿Cómo funciona?</h4>
+                 <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Información Registrada:</strong> Cada fila representa un evento. Verás qué PC lo generó, la fecha y hora, la acción realizada y el resultado.
+                        <strong>Detección de Versión:</strong> Cada vez que un agente se comunica con el servidor, reporta su versión actual. El servidor la compara con la última versión disponible.
                     </li>
-                    <li>
-                        <strong>Estado del Evento:</strong>
-                         <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li><BadgeUI className="bg-accent text-accent-foreground">Éxito</BadgeUI>: El paso se completó correctamente.</li>
-                            <li><BadgeUI variant="destructive">Fallo</BadgeUI>: Ocurrió un error. El mensaje te dará una pista de qué salió mal (ej. "Acceso denegado").</li>
-                            <li><BadgeUI variant="secondary">Omitido</BadgeUI>: El agente determinó que no era necesario realizar la acción. El caso más común es cuando se envía una orden de actualización a una PC que ya tiene la última versión.</li>
-                            <li><BadgeUI className="bg-yellow-500 text-white">Cancelado</BadgeUI>: La tarea fue cancelada manualmente desde el panel.</li>
-                         </ul>
+                     <li>
+                        <strong>Orden de Auto-Actualización:</strong> Si el servidor detecta que el agente está desactualizado (lo verás en <span className="text-red-500 font-bold">rojo</span> en el panel), su primera instrucción para el agente será que se auto-actualice, ignorando cualquier otra tarea.
                     </li>
-                    <li>
-                        <strong>Diagnóstico de Errores:</strong> Si una actualización falla, este es el primer lugar que debes revisar. El mensaje de error del log que falló te dirá exactamente por qué no pudo continuar (ej: no se pudo encontrar el archivo de actualización, no se pudo detener el servicio, etc.).
+                     <li>
+                        <strong>Proceso de Reemplazo:</strong> El agente antiguo descargará el nuevo paquete de instalación, lo ejecutará en un segundo plano, y el nuevo instalador se encargará de detener y reemplazar el servicio antiguo por el nuevo antes de terminar el proceso.
                     </li>
                 </ul>
+                <Alert variant="default" className="mt-4">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Proceso Automático</AlertTitle>
+                    <AlertDescription>
+                        No necesitas hacer nada. Si ves una versión de agente en rojo, el sistema intentará corregirlo en el próximo ciclo de comunicación del agente. Solo necesitas asegurarte de que el servidor tenga la última versión de los scripts del agente.
+                    </AlertDescription>
+                </Alert>
             </div>
         )
     },
     {
-        title: "Guía para Cancelar una Actualización",
-        icon: <Ban className="mr-4 h-6 w-6 text-yellow-500" />,
+        title: "Guía del Historial y Solución de Problemas",
+        icon: <History className="mr-4 h-6 w-6 text-purple-500" />,
         content: (
              <div className="space-y-4">
                 <p>
-                Si iniciaste una actualización por error o necesitas detenerla por alguna razón, puedes hacerlo mientras está en el estado "En progreso".
+                La página de Historial es tu mejor herramienta para entender qué ha sucedido en el sistema y para diagnosticar problemas.
                 </p>
-                <ol className="list-decimal space-y-3 pl-6">
+                <h4 className="font-semibold text-lg pt-2 border-t">Interpretando los Registros</h4>
+                <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Iniciar la Actualización:</strong> Haz clic en "Actualizar Ahora" en una PC. Se abrirá una ventana emergente (modal) indicando que la tarea ha sido enviada.
+                        <strong>Éxito:</strong> La operación se completó correctamente.
+                    </li>
+                     <li>
+                        <strong>Fallo:</strong> Ocurrió un error. El mensaje en el log te dará una pista crucial sobre qué salió mal (ej. "Acceso denegado a C:\SoftlandERP\sl.dll", "No se pudo detener el servicio 'Servicio1'").
+                    </li>
+                     <li>
+                        <strong>Omitido:</strong> El agente determinó que la actualización no era necesaria porque la PC ya tenía la última versión.
+                    </li>
+                    <li>
+                        <strong>Cancelado:</strong> La tarea fue cancelada manualmente desde el panel de control antes de que pudiera completarse.
+                    </li>
+                </ul>
+                 <h4 className="font-semibold text-lg pt-2 border-t">¿Cómo Cancelar una Tarea en Progreso?</h4>
+                 <ol className="list-decimal space-y-2 pl-5 mt-2">
+                    <li>
+                        <strong>Iniciar la Tarea:</strong> Haz clic en "Actualizar Ahora". Aparecerá una ventana emergente mostrando que la tarea está en progreso.
                     </li>
                     <li>
                         <strong>Localizar el Botón de Cancelar:</strong> Dentro de esa ventana emergente, verás un botón rojo que dice <span className="inline-flex items-center"><Button variant="destructive" size="sm" disabled><Ban className="mr-2 h-4 w-4" />Cancelar Tarea</Button></span>.
@@ -344,7 +394,7 @@ export default function HelpPage() {
                         <strong>Enviar la Orden de Cancelación:</strong> Al hacer clic en ese botón, el panel envía una "señal de cancelación" al servidor, que marca la tarea activa como `cancelado` en la base de datos.
                     </li>
                     <li>
-                        <strong>El Agente se Detiene:</strong> El agente en la PC cliente está diseñado para verificar periódicamente si su tarea ha sido cancelada. En cuanto detecte la señal (normalmente en pocos segundos), detendrá lo que esté haciendo, reportará el estado "Cancelado" y terminará su ejecución. La PC aparecerá en el panel con la etiqueta amarilla de "Cancelado".
+                        <strong>El Agente se Detiene:</strong> En su siguiente punto de control, el agente en la PC cliente verá que la tarea ha sido cancelada, detendrá su proceso, y reportará el estado de "Cancelado" al panel.
                     </li>
                 </ol>
             </div>
@@ -353,48 +403,51 @@ export default function HelpPage() {
   ];
 
   return (
-    <main className="flex-1 p-4 md:p-6 lg:p-8">
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
+    <main className="flex flex-col h-full">
+        <header className="p-6 pb-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-white">
-                <LifeBuoy className="h-6 w-6" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl">
-                    Manual de Usuario de Softland Updater
-                </CardTitle>
-                <CardDescription>
-                  Guía completa sobre cómo utilizar las herramientas y funcionalidades del sistema.
-                </CardDescription>
-              </div>
+                <LifeBuoy className="w-10 h-10 text-primary" />
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Centro de Ayuda</h1>
+                    <p className="text-muted-foreground mt-1">Encuentre respuestas y tutoriales sobre cómo usar Softland Updater.</p>
+                </div>
             </div>
-            <div className="relative mt-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Escribe para buscar en la ayuda (ej: 'agente', 'cancelar', 'csv')..."
-                className="w-full pl-10 h-12 text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="multiple" className="w-full">
-              {helpSections.map((section, index) => (
-                <HelpSection
-                  key={index}
-                  title={section.title}
-                  icon={section.icon}
-                  content={section.content}
-                  searchTerm={searchTerm}
-                />
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
-      </div>
+        </header>
+
+        <div className="flex-1 p-6">
+            <Card>
+                 <CardHeader className="border-b">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input 
+                            placeholder="Buscar en la documentación..." 
+                            className="pl-10 text-base"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Accordion 
+                        type="single" 
+                        collapsible 
+                        className="w-full"
+                        value={activeItem}
+                        onValueChange={setActiveItem}
+                    >
+                    {helpSections.map((section) => (
+                        <HelpSection
+                        key={section.title}
+                        title={section.title}
+                        icon={section.icon}
+                        content={section.content}
+                        searchTerm={searchTerm}
+                        />
+                    ))}
+                    </Accordion>
+                </CardContent>
+            </Card>
+        </div>
     </main>
   );
 }
