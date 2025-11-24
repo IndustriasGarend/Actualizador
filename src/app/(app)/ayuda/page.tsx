@@ -375,7 +375,7 @@ export default function HelpPage() {
                         <strong>Si la orden es auto-actualizar:</strong> El agente antiguo descarga el nuevo paquete, ejecuta el nuevo instalador (que limpia versiones viejas) y luego se detiene. Este proceso es automático y garantiza que los agentes se mantengan al día sin intervención manual.
                     </li>
                      <li>
-                        <strong>Si la orden es actualizar Softland:</strong> El agente ejecuta el proceso de actualización paso a paso, enviando logs al servidor sobre el progreso y resultado de cada etapa. Estos pasos incluyen el desbloqueo de archivos descargados para evitar problemas de seguridad de Windows.
+                        <strong>Si la orden es actualizar Softland:</strong> El agente ejecuta el proceso de actualización paso a paso, enviando logs al servidor sobre el progreso y resultado de cada etapa. Estos pasos incluyen el desbloqueo de archivos descargados para evitar problemas de seguridad de Windows y el registro automático de componentes basado en el archivo `ERPReg.xml` que venga en la actualización.
                     </li>
                      <li>
                         <strong>Si no hay tareas:</strong> El agente espera un intervalo de tiempo y vuelve a empezar el ciclo desde el Paso 1.

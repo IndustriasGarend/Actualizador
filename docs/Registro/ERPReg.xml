@@ -1,0 +1,62 @@
+<?xml version="1.0" standalone="yes"?>
+<!--Copyright 2013 Softland-->
+<!--Componentes para registro-->
+<COMPONENTES>	
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="AS" CLSID="" Typelib="" Interface="">Softland.ERP.AS.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="AF" CLSID="" Typelib="" Interface="">Softland.ERP.AF.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="AM" CLSID="" Typelib="" Interface="">Softland.ERP.AM.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="AP" CLSID="" Typelib="" Interface="">Softland.ERP.AP.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CB" CLSID="" Typelib="" Interface="">Softland.ERP.CB.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CC" CLSID="" Typelib="" Interface="">Softland.ERP.CC.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CG" CLSID="" Typelib="" Interface="">Softland.ERP.CG.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CH" CLSID="" Typelib="" Interface="">Softland.ERP.CH.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CI" CLSID="" Typelib="" Interface="">Softland.ERP.CI.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CN" CLSID="" Typelib="" Interface="">Softland.ERP.CN.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CO" CLSID="" Typelib="" Interface="">Softland.ERP.CO.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CP" CLSID="" Typelib="" Interface="">Softland.ERP.CP.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CR" CLSID="" Typelib="" Interface="">Softland.ERP.CR.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CV" CLSID="" Typelib="" Interface="">Softland.ERP.CV.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="EV" CLSID="" Typelib="" Interface="">Softland.ERP.EV.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="FA" CLSID="" Typelib="" Interface="">Softland.ERP.FA.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="PC" CLSID="" Typelib="" Interface="">Softland.ERP.PC.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="PM" CLSID="" Typelib="" Interface="">Softland.ERP.PM.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="PR" CLSID="" Typelib="" Interface="">Softland.ERP.PR.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="PV" CLSID="" Typelib="" Interface="">Softland.ERP.PV.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="RH" CLSID="" Typelib="" Interface="">Softland.ERP.RH.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="RM" CLSID="" Typelib="" Interface="">Softland.ERP.RM.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="SUBC" CLSID="" Typelib="" Interface="">Softland.ERP.SUBC.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CONT" CLSID="" Typelib="" Interface="">Softland.ERP.Cont.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="ACCONT" CLSID="" Typelib="" Interface="">Softland.ERP.AC.Cont.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CNAPI" CLSID="" Typelib="" Interface="">Softland.API.CN.Modulo</COMPONENTE>
+  <COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="GN" CLSID="" Typelib="" Interface="">Softland.ERP.GN.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CalcRetenciones" CLSID="B799C1B4-155B-49D5-9284-25C9833FB842" Typelib="351C84CC-FB10-4DCE-A304-4516D12C24E3" Interface="65C6B7AF-5321-48F8-807B-5C4EC055AB6A">Softland.ERP.PO.CalcRetenciones.v700.Retencion</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLY" Area="Deploy" Nombre="Componente Crystal (ExCryReportXI)">ExCryReportXI.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="ComprobantesPago">ComprobantesPago.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLY" Area="Deploy" Nombre="Softland.ERP.CC.Bridge">Softland.ERP.CC.Bridge.v700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CF.Bridge">Softland.ERP.CF.Bridge.v700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.AS.Bridge">Softland.ERP.AS.Bridge.v700.dll</COMPONENTE>		
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.AS.Bridge.v45">Softland.ERP.AS.Bridge.v45.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CP.Bridge">Softland.ERP.CP.Bridge.v700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CI.Bridge">Softland.ERP.CI.Bridge.v700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.FA.Descuentos">Softland.ERP.FA.Descuentos.v700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLY" Area="Deploy" Nombre="Softland.Cargador">Softland.Cargador.v700.dll</COMPONENTE>	
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.Tools.Bridge.v701">Softland.Tools.Bridge.v701.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.UFL.v701">Softland.ERP.UFL.v701.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.RP.Bridge.v701">Softland.ERP.RP.Bridge.v701.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLY" Area="Deploy" Nombre="ExactusSMTP">ExactusSMTP.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CN.Bridge.v701">Softland.ERP.CN.Bridge.v701.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.RH.Bridge.v701">Softland.ERP.RH.Bridge.v701.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.CapitalHumano.Bridge.v701">Softland.CapitalHumano.Bridge.v701.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CN.BAPI.v700">Softland.ERP.CN.BAPI.v700.dll</COMPONENTE>	
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CG.Bridge">Softland.ERP.CG.Bridge.dll</COMPONENTE>		
+	<COMPONENTE Tipo="ASSEMBLY" Area="Deploy" Nombre="Softland.ERP.FC.Com.V700">Softland.ERP.FC.Com.V700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.AC.Com.V700">Softland.ERP.AC.Com.V700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLY" Area="Deploy" Nombre="Softland.ERP.CG.EjecutarSP.v700">Softland.ERP.CG.EjecutarSP.v700.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Transferencias">ERPTransferencias.v700.dll</COMPONENTE>	
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.FA.ImpresoraFiscal">Softland.ERP.FA.ImpresoraFiscal.v700.dll</COMPONENTE>	
+	<COMPONENTE Tipo="REGSVR32" Area="Deploy" Nombre="Funciones Crystal(CRUFLCRB)">CRUFLCRB.dll</COMPONENTE>
+	<COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Gestor de Comunicación">GE.Bridge.dll</COMPONENTE>
+  <COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.CV.Bridge">Softland.ERP.CV.Bridge.dll</COMPONENTE>
+  <COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.FA.Impuestos.v700">Softland.ERP.FA.Impuestos.v700.dll</COMPONENTE>
+  <COMPONENTE Tipo="ASSEMBLYv4" Area="Deploy" Nombre="Softland.ERP.DE.Bridge.v700">Softland.ERP.DE.Bridge.v700.dll</COMPONENTE>
+</COMPONENTES>

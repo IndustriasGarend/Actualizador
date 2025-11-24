@@ -17,12 +17,11 @@ interface UpdateModalProps {
 
 const initialSteps: UpdateStep[] = [
   { name: "Verificando versión actual", status: 'pending' },
-  { name: "Deteniendo servicio 'Softland POS Sincronización'", status: 'pending' },
-  { name: "Cerrando procesos 'Softland'", status: 'pending' },
+  { name: "Deteniendo servicios necesarios", status: 'pending' },
   { name: 'Copiando archivos de actualización', status: 'pending' },
   { name: 'Extrayendo archivos', status: 'pending' },
   { name: 'Desbloqueando archivos', status: 'pending' },
-  { name: 'Registrando módulos', status: 'pending' },
+  { name: 'Configurando nuevos componentes', status: 'pending' },
 ];
 
 const StatusIcon = ({ status }: { status: UpdateStatus }) => {

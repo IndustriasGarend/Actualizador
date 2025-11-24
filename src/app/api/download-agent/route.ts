@@ -43,6 +43,12 @@ export async function GET(request: Request) {
         zip.file('install-service.ps1', installScriptContent);
         zip.file('install.bat', installBatContent);
         
+        // Incluir 7za.exe en el zip para que esté disponible para el agente
+        const sevenZipPath = path.join(process.cwd(), 'scripts', '7za.exe');
+        const sevenZipBuffer = await fs.readFile(sevenZipPath);
+        zip.file('7za.exe', sevenZipBuffer);
+
+
         let zipFilename = `softland-agent-update.zip`;
 
         if (!forUpdate) {
