@@ -1,0 +1,142 @@
+# Softland Updater Agent
+# Este script se ejecuta en cada PC cliente para buscar y ejecutar tareas de actualización.
+
+# --- Configuración ---
+$ServerUrl = "__SERVER_URL__"
+$PcId = "__PC_ID__"
+$CheckIntervalSeconds = 60 # Tiempo de espera entre cada verificación de tareas
+$LogFile = "C:\ProgramData\SoftlandUpdaterAgent.log"
+
+# --- Funciones ---
+function Write-Log {
+    param(
+        [string]$Message
+    )
+    $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $LogMessage = "[$Timestamp] $Message"
+    Add-Content -Path $LogFile -Value $LogMessage
+    # Opcional: Mostrar en consola si se ejecuta interactivamente
+    Write-Host $LogMessage
+}
+
+function Report-Status {
+    param(
+        [string]$Action,
+        [string]$Status, # "Éxito" o "Fallo"
+        [string]$Message
+    )
+    $body = @{
+        pcId = $PcId
+        pcName = $env:COMPUTERNAME
+        action = $Action
+        status = $Status
+        message = $Message
+    } | ConvertTo-Json
+
+    try {
+        Invoke-RestMethod -Uri "$ServerUrl/api/tasks/log" -Method Post -Body $body -ContentType 'application/json'
+        Write-Log "Reporte enviado: [Accion: $Action, Estado: $Status]"
+    }
+    catch {
+        Write-Log "ERROR: No se pudo enviar el reporte de estado al servidor. $_"
+    }
+}
+
+function Get-SoftlandConfig {
+    # En una implementación real, esto podría leer la config desde el servidor.
+    # Por ahora, usamos valores hardcodeados que coinciden con los del panel.
+    return @{
+        UpdateFilePath = "\\servidor\updates\update.7z"
+        LocalUpdateDir = "C:\Actualizacion"
+        SoftlandInstallDir = "C:\SoftlandERP"
+        ServiceName = "Softland POS Sincronización"
+    }
+}
+
+function Execute-Update {
+    Write-Log "--- Iniciando Proceso de Actualización ---"
+    $config = Get-SoftlandConfig
+    
+    # Paso 1: Detener servicio
+    Report-Status "Deteniendo servicio" "Éxito" "Intentando detener '$($config.ServiceName)'..."
+    try {
+        Stop-Service -Name $config.ServiceName -Force -ErrorAction Stop
+        Write-Log "Servicio '$($config.ServiceName)' detenido."
+        Report-Status "Servicio detenido" "Éxito" "El servicio se detuvo correctamente."
+    } catch {
+        Write-Log "ADVERTENCIA: No se pudo detener el servicio '$($config.ServiceName)'. Puede que no estuviera corriendo. $_"
+        Report-Status "Servicio detenido" "Éxito" "No se pudo detener el servicio (puede que no estuviera corriendo)."
+    }
+
+    # Paso 2: Cerrar procesos
+    Report-Status "Cerrando procesos" "Éxito" "Intentando cerrar procesos 'Softland'..."
+    Get-Process | Where-Object { $_.ProcessName -like "*softland*" } | Stop-Process -Force
+    Write-Log "Procesos 'Softland' cerrados."
+
+    # Paso 3: Copiar archivos
+    Report-Status "Copiando archivos" "Éxito" "Copiando desde '$($config.UpdateFilePath)'..."
+    try {
+        if (-not (Test-Path $config.LocalUpdateDir)) {
+            New-Item -Path $config.LocalUpdateDir -ItemType Directory
+        }
+        Copy-Item -Path $config.UpdateFilePath -Destination $config.LocalUpdateDir -Force -ErrorAction Stop
+        Write-Log "Archivo de actualización copiado a '$($config.LocalUpdateDir)'."
+        Report-Status "Copia de archivos" "Éxito" "Archivo copiado a directorio local."
+    } catch {
+        Write-Log "ERROR: Fallo al copiar el archivo de actualización. $_"
+        Report-Status "Copia de archivos" "Fallo" "No se pudo copiar el archivo desde la ruta de red. Verifique la ruta y permisos."
+        return # Detener ejecución si la copia falla
+    }
+
+    # Paso 4: Extraer archivos
+    Report-Status "Extrayendo archivos" "Éxito" "Extrayendo en '$($config.SoftlandInstallDir)'..."
+    try {
+        # Asume que 7-Zip está en el PATH o en una ubicación conocida
+        & "C:\Program Files\7-Zip\7z.exe" x "$($config.LocalUpdateDir)\update.7z" -o"$($config.SoftlandInstallDir)" -y
+        Write-Log "Archivos extraídos."
+        Report-Status "Extracción de archivos" "Éxito" "Archivos descomprimidos en el directorio de instalación."
+    } catch {
+        Write-Log "ERROR: Fallo al extraer los archivos. $_"
+        Report-Status "Extracción de archivos" "Fallo" "Error al descomprimir. Verifique que 7-Zip esté instalado y que haya permisos de escritura."
+        return
+    }
+
+    # Paso 5: Desbloquear archivos
+    Report-Status "Desbloqueando archivos" "Éxito" "Desbloqueando archivos en '$($config.SoftlandInstallDir)'..."
+    Get-ChildItem -Path $config.SoftlandInstallDir -Recurse | Unblock-File
+    Write-Log "Archivos desbloqueados."
+
+    # Paso 6: Registrar módulos (si aplica)
+    # Report-Status "Registrando módulos" "Éxito" "Ejecutando registro de módulos..."
+    # Lógica para registrar DLLs o ejecutar un .exe de registro
+
+    # Finalización
+    Write-Log "--- Proceso de Actualización Completado ---"
+    Report-Status "Actualización completada" "Éxito" "El proceso de actualización ha finalizado."
+}
+
+
+# --- Bucle Principal ---
+Write-Log "Iniciando Agente de Softland Updater para PC: $PcId"
+while ($true) {
+    try {
+        $Uri = "$ServerUrl/api/tasks/check/$PcId"
+        Write-Log "Verificando tareas en $Uri..."
+        $response = Invoke-RestMethod -Uri $Uri -Method Get
+
+        if ($response.task -eq 'actualizar') {
+            Write-Log "Tarea 'actualizar' recibida (ID: $($response.taskId))."
+            Execute-Update
+            # Aquí se podría marcar la tarea como completada en el servidor
+        } else {
+            Write-Log "Ninguna tarea pendiente."
+        }
+    }
+    catch {
+        Write-Log "ERROR: No se pudo conectar con el servidor. Verifique la conexión y la URL. $_"
+    }
+
+    # Esperar antes de la siguiente verificación
+    Write-Log "Durmiendo por $CheckIntervalSeconds segundos..."
+    Start-Sleep -Seconds $CheckIntervalSeconds
+}

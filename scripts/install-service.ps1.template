@@ -1,0 +1,67 @@
+# Script para instalar el Agente de Softland Updater como un servicio de Windows
+
+# --- Configuración ---
+$ServiceName = "SoftlandUpdateAgent___PC_NAME__"
+$ServiceDisplayName = "Softland Updater Agent (__PC_NAME__)"
+$ServiceDescription = "Agente que gestiona las actualizaciones de Softland de forma remota."
+
+# Obtener la ruta completa del script del agente (debe estar en la misma carpeta)
+$ScriptPath = Join-Path $PSScriptRoot "agent.ps1"
+
+# --- Verificación de Permisos ---
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Error "Este script debe ser ejecutado como Administrador."
+    Start-Sleep -Seconds 5
+    exit 1
+}
+
+# --- Lógica de Instalación ---
+Write-Host "Verificando si el servicio '$ServiceName' ya existe..."
+$service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+
+if ($service) {
+    Write-Host "El servicio ya existe. Deteniendo y eliminándolo para reinstalar..."
+    Stop-Service -Name $ServiceName -Force
+    $service | Remove-Service -Force
+    Write-Host "Servicio anterior eliminado."
+    Start-Sleep -Seconds 2
+}
+
+Write-Host "Creando el nuevo servicio '$ServiceName'..."
+
+# El comando para ejecutar el script de PowerShell como servicio
+$command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+
+New-Service -Name $ServiceName `
+    -BinaryPathName $command `
+    -DisplayName $ServiceDisplayName `
+    -Description $ServiceDescription `
+    -StartupType Automatic
+
+if (Get-Service -Name $ServiceName) {
+    Write-Host "Servicio creado exitosamente."
+    
+    # Opcional: Configurar la recuperación del servicio en caso de fallo
+    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
+    Write-Host "Configurando recuperación automática del servicio."
+
+    Write-Host "Iniciando el servicio..."
+    Start-Service -Name $ServiceName
+    
+    Start-Sleep -Seconds 2
+    
+    $status = (Get-Service -Name $ServiceName).Status
+    Write-Host "Estado del servicio: $status"
+
+    if($status -eq "Running") {
+        Write-Host "¡Instalación completada!" -ForegroundColor Green
+    } else {
+        Write-Host "El servicio no pudo iniciarse. Verifique los logs en C:\ProgramData\SoftlandUpdaterAgent.log" -ForegroundColor Yellow
+    }
+
+} else {
+    Write-Error "Hubo un error al crear el servicio."
+}
+
+Write-Host "Presione cualquier tecla para salir."
+$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
