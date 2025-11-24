@@ -44,6 +44,7 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSaving(true);
+    // Aquí se guardaría la configuración en la base de datos
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log('Saving config:', values);
     toast({
@@ -55,6 +56,7 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
   
   async function onValidate() {
     setIsValidating(true);
+    // Aquí se podría validar la conexión a la ruta de red, etc.
     await new Promise(resolve => setTimeout(resolve, 1500));
     toast({
       title: 'Validación Exitosa',
@@ -138,9 +140,9 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                   <FormItem>
                     <FormLabel>Usuario Administrador</FormLabel>
                     <FormControl>
-                      <Input placeholder="admin" {...field} />
+                      <Input placeholder="dominio\\usuario" {...field} />
                     </FormControl>
-                    <FormDescription>Cuenta con permisos para realizar la actualización.</FormDescription>
+                    <FormDescription>Cuenta para ejecutar el servicio en el cliente.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -152,9 +154,9 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                   <FormItem>
                     <FormLabel>Contraseña de Administrador</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
-                    <FormDescription>Dejar en blanco si no se ha modificado.</FormDescription>
+                    <FormDescription>Se solicitará al instalar el servicio en el cliente.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

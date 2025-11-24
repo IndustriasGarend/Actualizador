@@ -18,7 +18,7 @@ export interface UpdateStep {
 }
 
 export interface LogEntry {
-  id: string;
+  id: number;
   pcId: string;
   pcName: string;
   timestamp: string;

@@ -1,67 +1,110 @@
-# Script para instalar el Agente de Softland Updater como un servicio de Windows
+#Requires -RunAsAdministrator
 
-# --- Configuración ---
-$ServiceName = "SoftlandUpdateAgent___PC_NAME__"
-$ServiceDisplayName = "Softland Updater Agent (__PC_NAME__)"
-$ServiceDescription = "Agente que gestiona las actualizaciones de Softland de forma remota."
+<#
+.SYNOPSIS
+    Instala el agente de actualización de Softland como un servicio de Windows.
+.DESCRIPTION
+    Este script crea un nuevo servicio de Windows que ejecutará el script 'agent.ps1'
+    de forma continua para buscar y aplicar actualizaciones de Softland.
+    Debe ejecutarse con privilegios de administrador.
+.PARAMETER ServiceUser
+    El nombre de usuario para ejecutar el servicio (ej: 'DOMINIO\usuario' o '.\usuario_local').
+    Si no se proporciona, se usará la cuenta 'LocalSystem'.
+.PARAMETER ServicePassword
+    La contraseña para la cuenta de usuario del servicio.
+    Se solicitará de forma segura si no se proporciona.
+#>
+param (
+    [string]$ServiceUser,
+    [string]$ServicePassword
+)
 
-# Obtener la ruta completa del script del agente (debe estar en la misma carpeta)
-$ScriptPath = Join-Path $PSScriptRoot "agent.ps1"
+$ErrorActionPreference = 'Stop'
 
-# --- Verificación de Permisos ---
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Error "Este script debe ser ejecutado como Administrador."
-    Start-Sleep -Seconds 5
+# --- Variables de configuración ---
+$serviceName = "SoftlandUpdateAgent___PC_NAME__"
+$serviceDisplayName = "Softland Update Agent (__PC_NAME__)"
+$serviceDescription = "Servicio que gestiona las actualizaciones automáticas del sistema Softland."
+
+# Obtener la ruta del directorio actual donde se encuentra el script
+try {
+    $scriptPath = $PSScriptRoot
+    if (-not $scriptPath) {
+        $scriptPath = Split-Path -Path $MyInvocation.MyCommand.Path -Parent
+    }
+} catch {
+    Write-Error "No se pudo determinar la ruta del script. Asegúrese de estar ejecutando el script desde el directorio donde se encuentra."
     exit 1
 }
 
-# --- Lógica de Instalación ---
-Write-Host "Verificando si el servicio '$ServiceName' ya existe..."
-$service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+$agentScriptPath = Join-Path $scriptPath "agent.ps1"
 
+# --- Comprobaciones previas ---
+if (-not (Test-Path $agentScriptPath)) {
+    Write-Error "Error: No se encuentra el archivo 'agent.ps1' en el directorio '$scriptPath'."
+    exit 1
+}
+
+# Comprobar si el servicio ya existe
+$service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if ($service) {
-    Write-Host "El servicio ya existe. Deteniendo y eliminándolo para reinstalar..."
-    Stop-Service -Name $ServiceName -Force
-    $service | Remove-Service -Force
+    Write-Warning "El servicio '$serviceName' ya existe. Se detendrá y se volverá a crear."
+    Stop-Service -Name $serviceName -Force
+    # Espera a que el servicio se detenga completamente
+    $service | Get-Service | Wait-Process -Timeout 30
+    Remove-Service -Name $serviceName -Force
     Write-Host "Servicio anterior eliminado."
-    Start-Sleep -Seconds 2
 }
 
-Write-Host "Creando el nuevo servicio '$ServiceName'..."
-
-# El comando para ejecutar el script de PowerShell como servicio
-$command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
-
-New-Service -Name $ServiceName `
-    -BinaryPathName $command `
-    -DisplayName $ServiceDisplayName `
-    -Description $ServiceDescription `
-    -StartupType Automatic
-
-if (Get-Service -Name $ServiceName) {
-    Write-Host "Servicio creado exitosamente."
-    
-    # Opcional: Configurar la recuperación del servicio en caso de fallo
-    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
-    Write-Host "Configurando recuperación automática del servicio."
-
-    Write-Host "Iniciando el servicio..."
-    Start-Service -Name $ServiceName
-    
-    Start-Sleep -Seconds 2
-    
-    $status = (Get-Service -Name $ServiceName).Status
-    Write-Host "Estado del servicio: $status"
-
-    if($status -eq "Running") {
-        Write-Host "¡Instalación completada!" -ForegroundColor Green
-    } else {
-        Write-Host "El servicio no pudo iniciarse. Verifique los logs en C:\ProgramData\SoftlandUpdaterAgent.log" -ForegroundColor Yellow
+# --- Lógica de credenciales ---
+$credentialParams = @{}
+if (-not [string]::IsNullOrEmpty($ServiceUser)) {
+    if ([string]::IsNullOrEmpty($ServicePassword)) {
+        # Solicitar la contraseña de forma segura si el usuario fue provisto pero la contraseña no
+        Write-Host "Por favor, ingrese la contraseña para el usuario '$ServiceUser'."
+        $ServicePassword = Read-Host -AsSecureString
     }
-
+    # Crear el objeto de credencial
+    $credential = New-Object System.Management.Automation.PSCredential($ServiceUser, $ServicePassword)
+    $credentialParams.Add("Credential", $credential)
 } else {
-    Write-Error "Hubo un error al crear el servicio."
+    Write-Host "Instalando el servicio con la cuenta 'LocalSystem'. Esta cuenta podría no tener permisos de red."
 }
 
-Write-Host "Presione cualquier tecla para salir."
-$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
+
+# --- Creación del servicio ---
+Write-Host "Creando el servicio '$serviceName'..."
+
+try {
+    New-Service -Name $serviceName `
+        -BinaryPathName "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$agentScriptPath`"" `
+        -DisplayName $serviceDisplayName `
+        -Description $serviceDescription `
+        -StartupType Automatic `
+        @credentialParams
+
+    # Configurar la recuperación ante fallos
+    sc.exe failure $serviceName reset= 86400 actions= restart/60000/restart/60000/restart/120000
+
+    Write-Host "Servicio creado exitosamente."
+}
+catch {
+    Write-Error "Ocurrió un error al crear el servicio: $_"
+    Write-Error "Asegúrese de estar ejecutando este script como Administrador."
+    exit 1
+}
+
+# --- Iniciar el servicio ---
+Write-Host "Iniciando el servicio..."
+Start-Service -Name $serviceName
+
+# Verificar el estado final
+$finalService = Get-Service -Name $serviceName
+if ($finalService.Status -eq 'Running') {
+    Write-Host "¡Éxito! El servicio '$serviceName' se ha instalado y está en ejecución."
+    Write-Host "El agente ahora está monitoreando tareas de actualización desde el servidor."
+}
+else {
+    Write-Error "El servicio se instaló, pero no se pudo iniciar. Estado actual: $($finalService.Status)."
+    Write-Error "Revise el visor de eventos para más detalles."
+}
