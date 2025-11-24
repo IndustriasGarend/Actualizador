@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { PC } from '@/lib/types';
-import { pcs as initialPcs } from '@/lib/data';
 import { UpdateModal } from './update-modal';
 import { cn } from '@/lib/utils';
 
@@ -24,8 +23,11 @@ function ClientFormattedDate({ dateString }: { dateString: string | null }) {
   return <>{formattedDate || <span className="opacity-50">Cargando...</span>}</>;
 }
 
+interface PcListProps {
+  initialPcs: PC[];
+}
 
-export function PcList() {
+export function PcList({ initialPcs }: PcListProps) {
   const [pcs, setPcs] = useState<PC[]>(initialPcs);
   const [selectedPc, setSelectedPc] = useState<PC | null>(null);
 
