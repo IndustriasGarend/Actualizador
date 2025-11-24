@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle, Edit } from 'lucide-react';
