@@ -39,11 +39,11 @@ export async function GET(request: Request) {
 
         // Reemplazar los placeholders en los scripts
         const agentScriptContent = agentScriptTemplate
-            .replace('__SERVER_URL__', serverUrl)
-            .replace('__PC_ID__', pcId || '__PC_ID_PLACEHOLDER__'); // Placeholder si es para update
+            .replace(/__SERVER_URL__/g, serverUrl)
+            .replace(/__PC_ID__/g, pcId || '__PC_ID_PLACEHOLDER__');
             
         const installScriptContent = installScriptTemplate
-            .replace('__PC_NAME__', pcName || '__PC_NAME_PLACEHOLDER__'); // Placeholder si es para update
+            .replace(/__PC_NAME__/g, pcName || '__PC_NAME_PLACEHOLDER__');
         
         // Crear el archivo ZIP en memoria
         const zip = new JSZip();
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
         if (!forUpdate) {
             zipFilename = `softland-agent-${pcName}.zip`;
-            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la cuenta y contrasena para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName}' sera creado e iniciado.`);
+            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la cuenta y contrasena para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName.replace(/-/g, "").replace(/ /g,"")}' sera creado e iniciado.`);
             
             // Insertar la PC en la base de datos si no existe
             const stmt = db.prepare('INSERT OR IGNORE INTO pcs (id, name, alias, location, ip, status) VALUES (?, ?, ?, ?, ?, ?)');

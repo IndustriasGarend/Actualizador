@@ -1,32 +1,62 @@
-# Softland Updater Agent
+# --- Softland Updater Agent ---
 # Version: 1.1
 
-# --- Configuracion ---
+# --- Configuracion (se reemplaza durante la generacion) ---
 $ServerUrl = "__SERVER_URL__"
-$PcId = "__PC_ID__"
-$AgentVersion = "1.1" # Esta es la version del agente. Debe coincidir con LATEST_AGENT_VERSION en el servidor.
-$TempDir = $env:TEMP
-$PauseIntervalSeconds = 60 # Tiempo de espera entre verificaciones si no hay tareas
+$PCId = "__PC_ID__"
+$AgentVersion = "1.1"
+
+# --- Variables Globales ---
+$SevenZipPath = Join-Path $PSScriptRoot "7za.exe"
 
 # --- Funciones ---
+function Get-HardwareInfo {
+    $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+    $cpuInfo = Get-CimInstance -ClassName Win32_Processor
+    $memoryInfo = Get-CimInstance -ClassName Win32_ComputerSystem
+    $diskInfo = Get-CimInstance -ClassName Win32_DiskDrive | Where-Object { $_.MediaType -like 'Fixed*' -or $_.MediaType -like 'SSD*'}
 
-# Funcion para enviar logs al servidor
+    $disks = $diskInfo | ForEach-Object {
+        @{
+            model = $_.Model
+            size = [math]::Round($_.Size / 1GB)
+        }
+    }
+
+    return @{
+        osName = $osInfo.Caption
+        osVersion = $osInfo.Version
+        cpuModel = $cpuInfo.Name
+        cpuCores = $cpuInfo.NumberOfLogicalProcessors
+        totalMemory = [math]::Round($memoryInfo.TotalPhysicalMemory / 1MB)
+        disks = $disks | ConvertTo-Json -Compress
+    }
+}
+
+function Get-CurrentUserInfo {
+    try {
+        $user = (Get-WmiObject -Class Win32_ComputerSystem).Username
+        return $user
+    } catch {
+        return $null
+    }
+}
+
 function Send-Log {
     param(
         [string]$Action,
         [string]$Status,
-        [string]$Message = "",
+        [string]$Message,
         [string]$VersionId = $null,
-        [string]$TaskId = $null,
-        [object]$HardwareInfo = $null
+        [int]$TaskId = $null,
+        [boolean]$SendHardwareInfo = $false
     )
     
     $pcName = $env:COMPUTERNAME
-    $ip = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias (Get-NetConnectionProfile).InterfaceAlias).IPAddress
-    $loggedUser = (Get-WmiObject -ClassName Win32_ComputerSystem).UserName
-
+    $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias (Get-NetConnectionProfile).InterfaceAlias).IPAddress
+    
     $body = @{
-        pcId = $PcId
+        pcId = $PCId
         pcName = $pcName
         action = $Action
         status = $Status
@@ -34,195 +64,169 @@ function Send-Log {
         versionId = $VersionId
         taskId = $TaskId
         agentVersion = $AgentVersion
-        ip = $ip
-        loggedUser = $loggedUser
+        ip = $ipAddress
+        loggedUser = Get-CurrentUserInfo
     }
 
-    # Anadir informacion de hardware solo si se proporciona
-    if ($null -ne $HardwareInfo) {
-        $body.Add("hardwareInfo", $HardwareInfo)
+    if ($SendHardwareInfo) {
+        $body.Add("hardwareInfo", (Get-HardwareInfo))
     }
 
-    $jsonBody = $body | ConvertTo-Json -Depth 4
-    
     try {
-        Invoke-RestMethod -Uri "$ServerUrl/api/tasks/log" -Method Post -Body $jsonBody -ContentType "application/json" -TimeoutSec 30
+        Invoke-RestMethod -Uri "$ServerUrl/api/tasks/log" -Method Post -Body ($body | ConvertTo-Json) -ContentType "application/json"
+        Write-Host "Log enviado: $Action - $Status"
     } catch {
-        # Fallo al enviar el log, se imprime en la consola del agente (visible en debug)
-        Write-Output "Error al enviar log: $($_.Exception.Message)"
+        Write-Host "Error al enviar log: $($_.Exception.Message)"
     }
 }
 
-# Funcion para recolectar informacion del hardware
-function Get-HardwareInfo {
-    $os = Get-WmiObject -Class Win32_OperatingSystem
-    $cpu = Get-WmiObject -Class Win32_Processor
-    $mem = Get-WmiObject -Class Win32_ComputerSystem
-    $disks = Get-WmiObject -Class Win32_DiskDrive | Where-Object { $_.MediaType -eq "Fixed hard disk media" -or $_.MediaType -like "*SSD*" }
-    
-    $diskInfo = @()
-    foreach ($disk in $disks) {
-        $diskInfo += @{
-            model = $disk.Model
-            size = [math]::Round($disk.Size / 1GB)
-        }
-    }
-
-    return @{
-        osName = $os.Caption
-        osVersion = $os.Version
-        cpuModel = $cpu.Name
-        cpuCores = $cpu.NumberOfLogicalProcessors
-        totalMemory = [math]::Round($mem.TotalPhysicalMemory / 1MB)
-        disks = $diskInfo | ConvertTo-Json -Compress
-    }
-}
-
-# Funcion para registrar componentes de Softland segun ERPReg.xml
 function Register-SoftlandComponents {
     param(
-        [string]$InstallDir
+        [string]$InstallPath,
+        [int]$TaskId
     )
-    $regXmlPath = Join-Path $InstallDir "ERPReg.xml"
-    if (-not (Test-Path $regXmlPath)) {
-        Send-Log -Action "Registro de Componentes" -Status "Omitido" -Message "Archivo ERPReg.xml no encontrado."
+    $regFile = Join-Path $InstallPath "ERPReg.xml"
+    if (-not (Test-Path $regFile)) {
+        Send-Log -Action "Registro de Componentes" -Status "Omitido" -Message "No se encontro ERPReg.xml." -TaskId $TaskId
         return
     }
 
-    Send-Log -Action "Registro de Componentes" -Status "Exito" -Message "Iniciando registro basado en ERPReg.xml."
-    $xml = [xml](Get-Content $regXmlPath)
-    $regAsmPath = Join-Path ([System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) "RegAsm.exe"
-    $regAsmPathV4 = Join-Path (${env:SystemRoot} + "\Microsoft.NET\Framework\v4.0.30319") "RegAsm.exe"
-
-
-    foreach ($componente in $xml.COMPONENTES.COMPONENTE) {
-        $componentePath = Join-Path $InstallDir $componente.Nombre
-        $logMessage = "Registrando $($componente.Nombre)"
-
-        try {
-            switch ($componente.Tipo) {
-                "REGSVR32" {
-                    Start-Process "regsvr32.exe" -ArgumentList "/s `"$componentePath`"" -Wait
-                }
-                "ASSEMBLY" {
-                    Start-Process $regAsmPath -ArgumentList "/silent /codebase `"$componentePath`"" -Wait
-                }
-                "ASSEMBLYv4" {
-                    Start-Process $regAsmPathV4 -ArgumentList "/silent /codebase `"$componentePath`"" -Wait
-                }
-                "COMEXE" {
-                    Start-Process $componentePath -ArgumentList "/regserver" -Wait
-                }
-                default {
-                    $logMessage = "Tipo de componente $($componente.Tipo) no soportado para $($componente.Nombre)."
-                }
-            }
-            Send-Log -Action "Registro de Componentes" -Status "Exito" -Message $logMessage
-        } catch {
-            Send-Log -Action "Registro de Componentes" -Status "Fallo" -Message "Error registrando $($componente.Nombre): $($_.Exception.Message)"
-        }
-    }
-}
-
-
-# --- Ciclo Principal del Agente ---
-while ($true) {
     try {
-        # 1. Comprobar tareas
-        $checkBody = @{ agentVersion = $AgentVersion } | ConvertTo-Json
-        $response = Invoke-RestMethod -Uri "$ServerUrl/api/tasks/check/$PcId" -Method Post -Body $checkBody -ContentType "application/json"
+        [xml]$xml = Get-Content -Path $regFile
+        $components = $xml.COMPONENTES.COMPONENTE
+        
+        $regAsmPath = Join-Path ([System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) "RegAsm.exe"
+        $regAsmPathV4 = Join-Path "C:\Windows\Microsoft.NET\Framework\v4.0.30319" "RegAsm.exe"
 
-        # 2. Decidir accion basada en la respuesta
-        switch ($response.task) {
-            "actualizar_agente" {
-                Send-Log -Action "Auto-Actualizacion Agente" -Status "Exito" -Message "Version de agente desactualizada. Iniciando descarga."
-                $agentZipPath = Join-Path $TempDir "softland-agent-update.zip"
-                Invoke-WebRequest -Uri "$ServerUrl/api/download-agent?forUpdate=true" -OutFile $agentZipPath
-                
-                $unzipDir = Join-Path $TempDir "softland-agent-update-pkg"
-                if (Test-Path $unzipDir) { Remove-Item -Path $unzipDir -Recurse -Force }
-                Expand-Archive -Path $agentZipPath -DestinationPath $unzipDir -Force
-                
-                # Ejecutar el nuevo instalador. Este se encargara de desinstalar la version vieja.
-                $installScriptPath = Join-Path $unzipDir "install-service.ps1"
-                Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$installScriptPath`" -noninteractive" -Verb RunAs
-                
-                # Detener el servicio actual para que el nuevo instalador pueda reemplazarlo
-                Stop-Service -Name "SoftlandUpdateAgent_$(($env:COMPUTERNAME).replace('-', ''))" -Force
-                exit # El agente antiguo termina su ejecucion
+        foreach ($component in $components) {
+            $componentName = $component.Nombre
+            $componentType = $component.Tipo
+            $componentPath = Join-Path $InstallPath $componentName
+            
+            if(-not (Test-Path $componentPath)){
+                Send-Log -Action "Registro de Componentes" -Status "Fallo" -Message "No se encontro el archivo '$componentName' para registrar." -TaskId $TaskId
+                continue
             }
 
-            "cancelar" {
-                Send-Log -Action "Cancelacion de Tarea" -Status "Exito" -Message "Tarea $($response.taskId) cancelada por el servidor." -TaskId $response.taskId
-            }
-
-            "actualizar" {
-                # Proceso de actualizacion de Softland
-                $taskId = $response.taskId
-                $config = $response.config
-                $versionId = ([System.IO.Path]::GetFileNameWithoutExtension($config.updateFilePath)).Replace("_",".")
-
-                Send-Log -Action "Inicio de actualizacion" -Status "Exito" -Message "Iniciando proceso para $versionId" -TaskId $taskId
-
-                # Verificar si ya esta actualizado
-                $currentVersionReg = Get-ItemProperty -Path "HKLM:\Software\Softland" -Name "Version" -ErrorAction SilentlyContinue
-                if ($currentVersionReg -and $currentVersionReg.Version -eq $versionId) {
-                    Send-Log -Action "Version ya actualizada" -Status "Omitido" -Message "La PC ya tiene la version $versionId." -VersionId $versionId -TaskId $taskId
-                    Start-Sleep -Seconds $PauseIntervalSeconds
-                    continue
-                }
-
-                # Detener servicios
-                Send-Log -Action "Deteniendo servicios" -Status "Exito" -Message "Deteniendo: $($config.serviceName)" -TaskId $taskId
-                $serviceNames = $config.serviceName.Split(',') | ForEach-Object { $_.Trim() }
-                foreach ($sName in $serviceNames) {
-                    try {
-                        Stop-Process -Name $sName -Force -ErrorAction Stop
-                        Send-Log -Action "Deteniendo Proceso" -Status "Exito" -Message "Proceso '$sName' detenido." -TaskId $taskId
-                    } catch {
-                        Send-Log -Action "Deteniendo Proceso" -Status "Omitido" -Message "Proceso '$sName' no encontrado o ya detenido." -TaskId $taskId
+            try {
+                switch ($componentType) {
+                    "REGSVR32" {
+                        Start-Process "regsvr32.exe" -ArgumentList "/s `"$componentPath`"" -Wait
+                    }
+                    "ASSEMBLY" {
+                         Start-Process $regAsmPath -ArgumentList "/silent /codebase `"$componentPath`"" -Wait
+                    }
+                    "ASSEMBLYv4" {
+                         Start-Process $regAsmPathV4 -ArgumentList "/silent /codebase `"$componentPath`"" -Wait
                     }
                 }
-
-                # Copiar y extraer
-                $localUpdateDir = $config.localUpdateDir
-                if (-not (Test-Path $localUpdateDir)) { New-Item -Path $localUpdateDir -ItemType Directory }
-                $updateFile = $config.updateFilePath
-                $localUpdateFile = Join-Path $localUpdateDir ([System.IO.Path]::GetFileName($updateFile))
-
-                Send-Log -Action "Copiando archivos" -Status "Exito" -Message "Copiando desde $updateFile" -TaskId $taskId
-                Copy-Item -Path $updateFile -Destination $localUpdateFile -Force
-
-                Send-Log -Action "Extrayendo archivos" -Status "Exito" -Message "Extrayendo en $($config.softlandInstallDir)" -TaskId $taskId
-                $7zaPath = Join-Path $PSScriptRoot "7za.exe"
-                Start-Process -FilePath $7zaPath -ArgumentList "x `"$localUpdateFile`" -o`"$($config.softlandInstallDir)`" -y" -Wait
-                
-                # Desbloquear archivos
-                Send-Log -Action "Desbloqueando archivos" -Status "Exito" -Message "Desbloqueando en $($config.softlandInstallDir)" -TaskId $taskId
-                Get-ChildItem -Path $config.softlandInstallDir -Recurse | Unblock-File
-                
-                # Registrar Componentes
-                Register-SoftlandComponents -InstallDir $config.softlandInstallDir
-
-                # Guardar nueva version en el registro
-                $regPath = "HKLM:\Software\Softland"
-                if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force }
-                New-ItemProperty -Path $regPath -Name "Version" -Value $versionId -PropertyType String -Force
-
-                # Enviar reporte de hardware y finalizacion
-                $hwInfo = Get-HardwareInfo
-                Send-Log -Action "Actualizacion completada" -Status "Exito" -Message "Version $versionId instalada." -VersionId $versionId -TaskId $taskId -HardwareInfo $hwInfo
-            }
-
-            default { # 'ninguna'
-                # No hacer nada, solo esperar
+                 Send-Log -Action "Registro de Componentes" -Status "Exito" -Message "Componente '$componentName' registrado." -TaskId $TaskId
+            } catch {
+                Send-Log -Action "Registro de Componentes" -Status "Fallo" -Message "Error registrando '$componentName': $($_.Exception.Message)" -TaskId $TaskId
             }
         }
     } catch {
-        # Error general en el ciclo, se envia log de fallo
-        Send-Log -Action "Error de Agente" -Status "Fallo" -Message "Error inesperado: $($_.Exception.Message)"
+         Send-Log -Action "Registro de Componentes" -Status "Fallo" -Message "Error procesando ERPReg.xml: $($_.Exception.Message)" -TaskId $TaskId
+    }
+}
+
+# --- Ciclo Principal ---
+while ($true) {
+    try {
+        # 1. Enviar telemetria y verificar tareas
+        Send-Log -Action "Verificacion" -Status "Exito" -Message "Agente activo, verificando tareas." -SendHardwareInfo $true
+        
+        $response = Invoke-RestMethod -Uri "$ServerUrl/api/tasks/check/$PCId" -Method Post -Body (@{agentVersion = $AgentVersion} | ConvertTo-Json) -ContentType "application/json"
+        
+        # 2. Ejecutar tarea recibida
+        switch ($response.task) {
+            "actualizar_agente" {
+                Send-Log -Action "Auto-Actualizacion Agente" -Status "Exito" -Message "Iniciando descarga de nueva version del agente."
+                $updatePackagePath = Join-Path $PSScriptRoot "softland-agent-update.zip"
+                Invoke-WebRequest -Uri "$ServerUrl/api/download-agent?forUpdate=true" -OutFile $updatePackagePath
+                Expand-Archive -Path $updatePackagePath -DestinationPath $PSScriptRoot -Force
+                # El nuevo install.bat se encargara de reemplazar y reiniciar el servicio
+                Start-Process -FilePath (Join-Path $PSScriptRoot "install.bat")
+                # Detener el agente actual
+                exit
+            }
+            "cancelar" {
+                Send-Log -Action "Cancelacion" -Status "Exito" -Message "Tarea de actualizacion cancelada desde el panel." -TaskId $response.taskId
+            }
+            "actualizar" {
+                $config = $response.config
+                $taskId = $response.taskId
+
+                Send-Log -Action "Inicio de actualizacion" -Status "Exito" -Message "Iniciando proceso de actualizacion." -TaskId $taskId
+                
+                # --- Paso 1: Verificar version actual (ejemplo, se podria mejorar)
+                $versionFile = Join-Path $config.softlandInstallDir "version.txt"
+                $currentVersion = if (Test-Path $versionFile) { Get-Content $versionFile } else { "desconocida" }
+                $updateFilename = [System.IO.Path]::GetFileName($config.updateFilePath)
+                if ($currentVersion -eq $updateFilename) {
+                    Send-Log -Action "Version ya actualizada" -Status "Omitido" -Message "La version actual ya es la mas reciente." -VersionId $updateFilename -TaskId $taskId
+                    continue
+                }
+
+                # --- Paso 2: Detener servicios
+                $serviceNames = $config.serviceName -split ',' | ForEach-Object { $_.Trim() }
+                foreach ($service in $serviceNames) {
+                    if (Get-Service $service -ErrorAction SilentlyContinue) {
+                        Send-Log -Action "Deteniendo servicio" -Status "Exito" -Message "Deteniendo servicio '$service'..." -TaskId $taskId
+                        Stop-Service -Name $service -Force
+                    }
+                }
+
+                # --- Paso 3: Limpiar y copiar archivos
+                $localUpdateDir = $config.localUpdateDir
+                if (Test-Path $localUpdateDir) {
+                    Remove-Item -Path $localUpdateDir -Recurse -Force
+                }
+                New-Item -Path $localUpdateDir -ItemType Directory
+                Send-Log -Action "Copiando archivos" -Status "Exito" -Message "Copiando desde $($config.updateFilePath)..." -TaskId $taskId
+                Copy-Item -Path $config.updateFilePath -Destination $localUpdateDir
+
+                # --- Paso 4: Extraer archivos
+                $archivePath = Join-Path $localUpdateDir $updateFilename
+                $destPath = $config.softlandInstallDir
+                Send-Log -Action "Extrayendo archivos" -Status "Exito" -Message "Extrayendo a '$destPath'..." -TaskId $taskId
+                Start-Process $SevenZipPath -ArgumentList "x `"$archivePath`" -o`"$destPath`" -y" -Wait -NoNewWindow
+
+                # --- Paso 5: Desbloquear archivos
+                Send-Log -Action "Desbloqueando archivos" -Status "Exito" -Message "Desbloqueando archivos en '$destPath'..." -TaskId $taskId
+                Get-ChildItem -Path $destPath -Recurse | Unblock-File
+
+                # --- Paso 6: Configurar nuevos componentes
+                Send-Log -Action "Configurando componentes" -Status "Exito" -Message "Procesando registro de modulos desde ERPReg.xml..." -TaskId $taskId
+                Register-SoftlandComponents -InstallPath $destPath -TaskId $taskId
+                
+                # --- Paso 7: Configurar variable de entorno
+                if ($config.environmentPath) {
+                    Send-Log -Action "Configurando PATH" -Status "Exito" -Message "Anadiendo rutas al PATH del sistema." -TaskId $taskId
+                    $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+                    $pathsToAdd = $config.environmentPath -split ';' | ForEach-Object { $_.Trim() }
+                    $newPath = $currentPath
+                    foreach($p in $pathsToAdd) {
+                        if($currentPath -notlike "*$p*") {
+                            $newPath += ";$p"
+                        }
+                    }
+                    [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+                }
+
+                # --- Paso Final: Reportar exito
+                Send-Log -Action "Actualizacion completada" -Status "Exito" -Message "Todos los modulos actualizados." -VersionId $updateFilename -TaskId $taskId
+                Write-Host "Actualizacion completada."
+            }
+            "ninguna" {
+                # No hay tareas, no hacer nada
+            }
+        }
+    } catch {
+        # Log de error general
+        Send-Log -Action "Error en Agente" -Status "Fallo" -Message "Error inesperado en el ciclo principal: $($_.Exception.Message)"
     }
     
     # Esperar antes de la proxima verificacion
-    Start-Sleep -Seconds $PauseIntervalSeconds
+    Start-Sleep -Seconds 60
 }

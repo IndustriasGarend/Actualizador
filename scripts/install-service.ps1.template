@@ -1,74 +1,68 @@
-# Script para instalar el servicio del agente de Softland Updater
+# Softland Updater Agent Installer
 
-# --- Variables ---
-$ServiceName = "SoftlandUpdateAgent_$(__PC_NAME__.replace('-', ''))"
-$ServiceDisplayName = "Softland Updater Agent (__PC_NAME__)"
-$ScriptPath = Join-Path $PSScriptRoot "agent.ps1"
-$PowerShellPath = (Get-Command powershell.exe).Path
-$exePath = """$PowerShellPath"" -ExecutionPolicy Bypass -NoProfile -File ""$ScriptPath"""
+# --- Configuracion ---
+$PCNameString = "__PC_NAME__"
+$ServiceName = "SoftlandUpdateAgent_" + $PCNameString.Replace("-", "").Replace(" ", "")
+$ServiceDisplayName = "Softland Updater Agent ($PCNameString)"
+$ServiceDescription = "Agente para el sistema de actualizacion remota de Softland. Mantiene el software actualizado y reporta el estado al servidor central."
 
-# --- Logica de Instalacion/Actualizacion ---
+# --- Inicio del Script ---
 Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
 
-# 1. Verificar si el servicio ya existe y desinstalarlo (para actualizaciones)
+# Desinstalar versiones antiguas si existen
 $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if ($null -ne $existingService) {
+if ($existingService) {
     Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
-    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-    # Esperar un poco para que el servicio se detenga completamente
-    Start-Sleep -Seconds 5 
-    
-    try {
-        $serviceConfig = Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'"
-        if ($serviceConfig) {
-            $serviceConfig.Delete()
-            Write-Host "Servicio anterior '$ServiceName' desinstalado."
-        }
-    } catch {
-        Write-Host "Advertencia: No se pudo eliminar el servicio anterior automaticamente: $($_.Exception.Message)"
-        Write-Host "Puede que necesite eliminarlo manualmente con 'sc.exe delete $ServiceName' desde un CMD como Administrador."
-    }
-    Start-Sleep -Seconds 2
+    Stop-Service -Name $ServiceName -Force
+    # Usamos sc.exe delete para mas fiabilidad
+    sc.exe delete $ServiceName
+    Write-Host "Servicio anterior '$ServiceName' desinstalado."
+    # Esperar un poco para que el SCM se actualice
+    Start-Sleep -Seconds 5
 }
 
-# 2. Solicitar credenciales
-# Para ejecucion no interactiva (actualizacion automatica)
-if ($noninteractive) {
-    # No se piden credenciales, se asume que el proceso padre tiene los permisos
-    Write-Host "Ejecucion no interactiva. El servicio se creara con la cuenta LocalSystem."
-    $credential = $null
-} else {
-    # Ejecucion interactiva (instalacion manual)
-    $cred_message = New-Object System.Management.Automation.Host.FieldDescription "Usuario (formato: DOMINIO\usuario)"
-    $cred_message.HelpMessage = "Ingrese la cuenta de servicio con permisos de administrador local."
-    $pass_message = New-Object System.Management.Automation.Host.FieldDescription "Contrasena"
-    $pass_message.HelpMessage = "Ingrese la contrasena para la cuenta de servicio."
-    
-    $credential = $host.ui.PromptForCredential("Credenciales para el Servicio", "Por favor, ingrese la cuenta y contrasena con la que se ejecutara el servicio del agente.", "", "Target", $cred_message, $pass_message)
-}
-
-
-# 3. Crear el nuevo servicio
-Write-Host "Creando el nuevo servicio '$ServiceName'..."
+# --- Peticion de Credenciales ---
+# Es crucial que este script se ejecute con permisos elevados.
+# El .bat que lo llama se encarga de esto.
 try {
+    # Definir el titulo y mensaje para la ventana de credenciales
+    $title = "Credenciales para el Servicio"
+    $message = "Ingrese el usuario y contrasena para ejecutar el servicio del agente (ej. DOMINIO\usuario.servicio)"
+
+    # Pedir las credenciales de forma segura
+    $credential = $host.ui.PromptForCredential($title, $message, "", "")
+
+    if ($null -eq $credential) {
+        Write-Host "Instalacion cancelada. No se ingresaron credenciales."
+        exit 1
+    }
+} catch {
+    Write-Host "Error al solicitar credenciales: $($_.Exception.Message)"
+    exit 1
+}
+
+
+# --- Creacion del Servicio ---
+try {
+    Write-Host "Creando el nuevo servicio '$ServiceName'..."
+    $scriptPath = (Get-Item -Path (Join-Path $PSScriptRoot 'agent.ps1')).FullName
+    
+    # Parametros para New-Service en un hashtable para mayor claridad
     $serviceParams = @{
         Name = $ServiceName
-        BinaryPathName = $exePath
+        BinaryPathName = "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`""
         DisplayName = $ServiceDisplayName
-        Description = "Agente de actualizacion para Softland ERP. Se comunica con el servidor central para ejecutar tareas."
-        StartupType = "Automatic"
+        Description = $ServiceDescription
+        StartupType = 'Automatic'
+        Credential = $credential
     }
-    if ($credential) {
-        $serviceParams.Credential = $credential
-    }
-
     New-Service @serviceParams
 
-    # 4. Configurar recuperacion en caso de fallo
+    # --- Configuracion de Recuperacion ---
     Write-Host "Configurando recuperacion del servicio..."
-    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/120000
+    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
 
-    # 5. Iniciar el servicio
+    # --- Iniciar el Servicio ---
     Write-Host "Iniciando el servicio '$ServiceName'..."
     Start-Service -Name $ServiceName
 
@@ -80,10 +74,8 @@ try {
     Write-Host "--------------------------------------------------------"
 
 } catch {
-    Write-Error "Ocurrio un error critico durante la creacion del servicio: $($_.Exception.Message)"
-    Write-Host "Verifique que las credenciales son correctas y que esta ejecutando el script como Administrador."
-}
-
-if (-not $noninteractive) {
-    Read-Host "Presione Enter para cerrar esta ventana"
+    Write-Host ""
+    Write-Host "Ocurrio un error durante la instalacion:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 1
 }

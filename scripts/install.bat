@@ -1,39 +1,16 @@
 @echo off
-:: BatchGotAdmin
-:-------------------------------------
-REM  --> Check for permissions
->nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
-
-REM --> If error flag set, we do not have admin.
-if '%errorlevel%' NEQ '0' (
-    echo Requesting administrative privileges...
-    goto UACPrompt
-) else ( goto gotAdmin )
-
-:UACPrompt
-    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
-    echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
-
-    "%temp%\getadmin.vbs"
-    del "%temp%\getadmin.vbs"
-    exit /B
-
-:gotAdmin
-    if exist "%temp%\getadmin.vbs" ( del "%temp%\getadmin.vbs" )
-    pushd "%CD%"
-    CD /D "%~dp0"
-:--------------------------------------
-
-echo.
-echo =======================================================
-echo ==    Instalador del Agente de Softland Updater    ==
-echo =======================================================
-echo.
+cls
 echo Este script instalara el agente como un servicio de Windows.
 echo Se requeriran credenciales de administrador para configurar el servicio.
 echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {
+    $scriptPath = (Get-Item -Path '.').FullName
+    $installScript = Join-Path $scriptPath 'install-service.ps1'
 
-powershell.exe -ExecutionPolicy Bypass -File ".\install-service.ps1"
-
-echo.
-pause
+    if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File ""{0}""' -f $installScript)
+    } else {
+        & $installScript
+    }
+    Read-Host 'Presione Enter para cerrar esta ventana:'
+}"
