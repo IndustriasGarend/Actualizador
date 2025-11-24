@@ -1,17 +1,18 @@
 import { PageHeader } from '@/components/page-header';
 import { PcList } from '@/components/dashboard/pc-list';
 import { Suspense } from 'react';
+import { db } from '@/lib/db';
 import type { PC } from '@/lib/types';
 
-// En un futuro, estos datos vendrán de la base de datos.
-const pcs: PC[] = [
-  { id: 'pc-1', name: 'CAJA-01', ip: '192.168.1.101', status: 'Actualizado', lastUpdate: '2024-05-19T10:00:00Z' },
-  { id: 'pc-2', name: 'CAJA-02', ip: '192.168.1.102', status: 'Pendiente', lastUpdate: '2024-05-10T14:30:00Z' },
-  { id: 'pc-3', name: 'OFICINA-CONTABLE', ip: '192.168.1.50', status: 'Error', lastUpdate: '2024-05-18T11:00:00Z' },
-  { id: 'pc-4', name: 'BODEGA', ip: '192.168.1.200', status: 'Pendiente', lastUpdate: null },
-];
+// Ahora, los datos se obtienen de la base de datos SQLite.
+function getPcs() {
+  const stmt = db.prepare('SELECT * FROM pcs ORDER BY name');
+  return stmt.all() as PC[];
+}
 
 export default function DashboardPage() {
+  const pcs = getPcs();
+
   return (
     <main className="flex flex-col h-full">
       <PageHeader

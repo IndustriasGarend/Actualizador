@@ -1,0 +1,73 @@
+image: docker.uib.gmbh/opsi/dev/pybuilder:deb9-py3.13
+
+stages:
+  - test
+  - doc
+  - publish
+
+lint-and-test:
+  #when: manual
+  services:
+    - name: mysql:8.3
+      command:
+        - --max_connections=1000
+        - --default-authentication-plugin=mysql_native_password
+  variables:
+    MYSQL_ROOT_PASSWORD: "opsi"
+    MYSQL_DATABASE: "opsi"
+  stage: test
+  script: |
+    mkdir -p /etc/opsi/licenses
+    mkdir -p /var/log/opsi
+
+    # Installing opsi test license
+    [ -z "${OPSILICSRV_TOKEN}" ] && (echo "OPSILICSRV_TOKEN not set" 1>&2 ; exit 1)
+    wget --header="Authorization: Bearer ${OPSILICSRV_TOKEN}" "https://opsi-license-server.uib.gmbh/api/v1/licenses/test?usage=python-opsi-gitlab-ci" -O /etc/opsi/licenses/test.opsilic
+
+    cp tests/Backends/config.py.gitlabci tests/Backends/config.py
+    apt-get update
+    apt-get --yes install default-libmysqlclient-dev librsync1
+    poetry env use 3.13
+    poetry lock
+    poetry install
+    poetry run ruff check OPSI tests
+    poetry add mysqlclient==2.1.1
+    poetry run pytest --tb=short -x -o junit_family=xunit2 --junitxml=testreport.xml --cov-append --cov-report term --cov-report xml -v tests
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+  artifacts:
+    name: 'python-opsi_test'
+    paths:
+      - coverage.xml
+      - testreport.xml
+    reports:
+        junit: testreport.xml
+    expire_in: 14 days
+
+
+apidoc:
+  stage: doc
+  when: manual
+  before_script:
+    - 'which ssh-agent || (apt update && apt -y install openssh-client)'
+    - 'which rsync || (apt update && apt -y install rsync)'
+    - mkdir -p ~/.ssh
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$BLOG_PUBLISH_PRIVATE_KEY")
+  script:
+    - poetry env use 3.13
+    - poetry lock
+    - poetry install
+    - poetry run opsi-dev-cli apidoc makehtml --output python-opsi
+    - ssh -o StrictHostKeyChecking=no "root@docker1.ext.uib.gmbh" "mkdir -p /var/lib/docker/volumes/docs_nginx_data/_data/python-docs"
+    - rsync -e "ssh -o StrictHostKeyChecking=no" --delete -azv python-opsi "root@docker1.ext.uib.gmbh:/var/lib/docker/volumes/docs_nginx_data/_data/python-docs/"
+
+
+uibpypi:
+  stage: publish
+  script:
+    - poetry env use 3.13
+    - poetry lock
+    - poetry install
+    - poetry run opsi-dev-tool -l info --uib-pypi-publish
+  only:
+    - tags

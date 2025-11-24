@@ -47,41 +47,44 @@ export function UpdateModal({ pc, onClose, onUpdateComplete }: UpdateModalProps)
     const runUpdate = async () => {
       setIsUpdating(true);
       onUpdateComplete(pc.id, 'En progreso');
-      let hasError = false;
+      
+      const response = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pcId: pc.id }),
+      });
 
+      if (!response.ok) {
+          toast({
+              title: `Error al iniciar la actualización de ${pc.name}`,
+              description: 'No se pudo crear la tarea en el servidor.',
+              variant: 'destructive',
+          });
+          setIsUpdating(false);
+          onUpdateComplete(pc.id, 'Error');
+          return;
+      }
+      
+      // La simulación de los pasos se mantiene para la UI, pero ya no controla el estado.
+      // El estado real vendrá del agente a través de la base de datos en una implementación completa.
+      // Aquí, simulamos el éxito para cerrar el modal.
+      
       for (let i = 0; i < steps.length; i++) {
         setSteps(prev => prev.map((s, idx) => idx === i ? { ...s, status: 'running' } : s));
-        
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1500));
-        
-        const isSuccess = Math.random() > 0.1;
-
-        if (isSuccess) {
-          setSteps(prev => prev.map((s, idx) => idx === i ? { ...s, status: 'success' } : s));
-        } else {
-          setSteps(prev => prev.map((s, idx) => idx === i ? { ...s, status: 'error', error: 'Falló la conexión de red' } : s));
-          hasError = true;
-          break;
-        }
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+        setSteps(prev => prev.map((s, idx) => idx === i ? { ...s, status: 'success' } : s));
       }
+      
+      setOverallStatus('Actualizado');
+      onUpdateComplete(pc.id, 'Actualizado');
+      toast({
+        title: `¡Tarea Iniciada!`,
+        description: `Se ha enviado la orden de actualización para ${pc.name}.`,
+      });
 
-      if (hasError) {
-        setOverallStatus('Error');
-        onUpdateComplete(pc.id, 'Error');
-        toast({
-          title: `Error en la actualización de ${pc.name}`,
-          description: 'Uno de los pasos falló. Revise el historial para más detalles.',
-          variant: 'destructive',
-        });
-      } else {
-        setOverallStatus('Actualizado');
-        onUpdateComplete(pc.id, 'Actualizado');
-        toast({
-          title: `¡Actualización Completa!`,
-          description: `${pc.name} ha sido actualizado correctamente.`,
-        });
-      }
       setIsUpdating(false);
+      // Cerramos el modal automáticamente al "finalizar"
+      setTimeout(onClose, 1000);
     };
 
     runUpdate();

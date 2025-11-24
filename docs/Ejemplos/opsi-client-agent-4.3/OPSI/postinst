@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# postinst script
+# This script executes after unpacking files from that archive and registering the product at the server.
+#
+# The following environment variables can be used to obtain information about the current installation:
+#   PRODUCT_ID: id of the current product
+#   CLIENT_DATA_DIR: directory which contains the installed client data
+#   DEPOT_ID
+#   PRODUCT_VERSION
+#   PACKAGE_VERSION
+PUBLIC_DIR="/var/lib/opsi/public"
+INSTALLER="${CLIENT_DATA_DIR}/oca-installation-helper.exe"
+
+if [ -e "${INSTALLER}" -a -d "${PUBLIC_DIR}" ]; then
+	mkdir -p "${PUBLIC_DIR}/opsi-client-agent" || true
+	if [ -d "${PUBLIC_DIR}/opsi-client-agent" ]; then
+		cp "${INSTALLER}" "${PUBLIC_DIR}/opsi-client-agent/opsi-client-agent-installer.exe" || true
+	fi
+fi
+
+chmod u+x,g+x $CLIENT_DATA_DIR/opsi-deploy-client-agent
+chmod u+x,g+x $CLIENT_DATA_DIR/service_setup.cmd
+chmod u+x,g+x $CLIENT_DATA_DIR/silent_setup.cmd
+
+TMP_DIR=${CLIENT_DATA_DIR}/../${PRODUCT_ID}.tmp
+if [ ! -d $TMP_DIR ]; then
+	echo "Nothing to do!"
+	exit 0
+fi
+
+if [ -d "${TMP_DIR}/custom" ]; then
+	echo "Restoring custom dir"
+	[ -e "${CLIENT_DATA_DIR}/files/custom" ] && rm -rf "${CLIENT_DATA_DIR}/files/custom"
+	mv "${TMP_DIR}/custom" "${CLIENT_DATA_DIR}/files/custom" || exit 1
+fi
+
+echo "Removing temporary files..."
+rm -rf "${TMP_DIR}"
+
+if [ -e "${CLIENT_DATA_DIR}/files/custom/winstskin" ]; then
+	[ -e "${CLIENT_DATA_DIR}/files/custom/opsi-script" ] || mkdir -p "${CLIENT_DATA_DIR}/files/custom/opsi-script"
+	mv "${CLIENT_DATA_DIR}/files/custom/winstskin" "${CLIENT_DATA_DIR}/files/custom/opsi-script/skin"
+fi
+[ -e "${CLIENT_DATA_DIR}/files/custom/opsi-notifier" ] && mv "${CLIENT_DATA_DIR}/files/custom/opsi-notifier" "${CLIENT_DATA_DIR}/files/custom/notifier"
+[ -e "${CLIENT_DATA_DIR}/files/custom/notifier" ] || mkdir -p "${CLIENT_DATA_DIR}/files/custom/notifier"
+[ -e "${CLIENT_DATA_DIR}/files/custom/opsiclientd" ] || mkdir -p "${CLIENT_DATA_DIR}/files/custom/opsiclientd"
+[ -e "${CLIENT_DATA_DIR}/files/custom/opsi-script/skin" ] || mkdir -p "${CLIENT_DATA_DIR}/files/custom/opsi-script/skin"
+
+exit 0
