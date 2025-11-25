@@ -46,12 +46,12 @@ export async function POST(request: Request) {
     if(hardwareInfo) {
         updateQuery += ", osName = ?, osVersion = ?, cpuModel = ?, cpuCores = ?, totalMemory = ?, disks = ?";
         params.push(
-            hardwareInfo.osName,
-            hardwareInfo.osVersion,
-            hardwareInfo.cpuModel,
-            hardwareInfo.cpuCores,
-            hardwareInfo.totalMemory,
-            hardwareInfo.disks,
+            hardwareInfo.osName || null,
+            hardwareInfo.osVersion || null,
+            hardwareInfo.cpuModel || null,
+            hardwareInfo.cpuCores || null,
+            hardwareInfo.totalMemory || null,
+            hardwareInfo.disks || null,
         );
     }
     if (pcStatus !== 'En progreso') {
