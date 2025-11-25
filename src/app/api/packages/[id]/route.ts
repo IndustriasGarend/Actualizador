@@ -5,13 +5,14 @@ import { z } from 'zod';
 const packageSchema = z.object({
   name: z.string().min(1, 'El nombre del paquete es requerido.'),
   description: z.string().optional(),
-  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell', 'registro_componentes']),
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell']),
   updateFilePath: z.string().optional(),
   localUpdateDir: z.string().optional(),
   installDir: z.string().optional(),
   serviceName: z.string().optional(),
   environmentPath: z.string().optional(),
   command: z.string().optional(),
+  postInstallScript: z.string().optional(),
 });
 
 export async function GET(
@@ -53,7 +54,7 @@ export async function PUT(
       return NextResponse.json({ message: 'Datos de paquete inválidos', errors: validatedBody.error.flatten() }, { status: 400 });
     }
     
-    const { name, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command } = validatedBody.data;
+    const { name, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command, postInstallScript } = validatedBody.data;
     
     const stmt = db.prepare(
         `UPDATE packages SET 
@@ -65,7 +66,8 @@ export async function PUT(
             installDir = ?, 
             serviceName = ?, 
             environmentPath = ?,
-            command = ?
+            command = ?,
+            postInstallScript = ?
         WHERE id = ?`
     );
     const result = stmt.run(
@@ -78,6 +80,7 @@ export async function PUT(
         serviceName || null, 
         environmentPath || null, 
         command || null,
+        postInstallScript || null,
         id
     );
 

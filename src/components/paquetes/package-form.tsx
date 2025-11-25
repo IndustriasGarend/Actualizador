@@ -23,11 +23,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Separator } from '../ui/separator';
 
 const formSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido.'),
   description: z.string().optional(),
-  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell', 'registro_componentes'], {
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell'], {
     required_error: "Debe seleccionar un tipo de paquete.",
   }),
   // Campos condicionales
@@ -37,6 +38,7 @@ const formSchema = z.object({
   serviceName: z.string().optional(),
   environmentPath: z.string().optional(),
   command: z.string().optional(),
+  postInstallScript: z.string().optional(),
 }).refine(data => {
     if (data.packageType === 'actualizacion_archivos') {
         return !!data.updateFilePath && !!data.installDir;
@@ -46,7 +48,7 @@ const formSchema = z.object({
     message: 'La ruta del archivo y el directorio de instalación son requeridos para este tipo de paquete.',
     path: ['installDir'],
 }).refine(data => {
-    if (data.packageType === 'ejecutar_script' || data.packageType === 'registro_componentes') {
+    if (data.packageType === 'ejecutar_script') {
         return !!data.updateFilePath;
     }
     return true;
@@ -99,6 +101,7 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
         serviceName: initialPackage?.serviceName || '',
         environmentPath: initialPackage?.environmentPath || '',
         command: initialPackage?.command || '',
+        postInstallScript: initialPackage?.postInstallScript || '',
     },
   });
 
@@ -179,7 +182,6 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
                                     <SelectItem value="actualizacion_archivos">Actualización de Archivos (copiar y pegar)</SelectItem>
                                     <SelectItem value="ejecutar_script">Ejecutar Script (.bat, .ps1)</SelectItem>
                                     <SelectItem value="comando_powershell">Comando PowerShell (ej. winget)</SelectItem>
-                                    <SelectItem value="registro_componentes">Registro de Componentes (desde XML)</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -201,94 +203,105 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
                 )}
             />
 
-            {/* CAMPOS CONDICIONALES */}
-            <div className="space-y-6 pt-4 border-t">
+            {packageType && (
+                <div className="space-y-6 pt-6 mt-6 border-t">
+                    {packageType === 'actualizacion_archivos' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h3 className="text-lg font-medium text-primary">Parámetros de Actualización de Archivos</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="updateFilePath" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center">Ruta de archivo comprimido<HelpTooltip>Ruta de red (UNC) al archivo .zip o .7z.</HelpTooltip></FormLabel>
+                                        <FormControl><Input placeholder="\\\\servidor\\updates\\update.7z" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="installDir" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center">Directorio de instalación/destino<HelpTooltip>Carpeta en la PC cliente donde se copiarán los archivos.</HelpTooltip></FormLabel>
+                                        <FormControl><Input placeholder="C:\\SoftlandERP" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="localUpdateDir" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center">Directorio de actualización local<HelpTooltip>Carpeta temporal en la PC cliente para extraer archivos.</HelpTooltip></FormLabel>
+                                        <FormControl><Input placeholder="C:\\Temp\\Update" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="serviceName" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center">Nombres de servicios a detener<HelpTooltip>(Opcional) Lista de servicios de Windows a detener, separados por comas.</HelpTooltip></FormLabel>
+                                        <FormControl><Input placeholder="Servicio1,Servicio POS" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                            </div>
+                            <FormField control={form.control} name="environmentPath" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center">Rutas para variable de entorno PATH<HelpTooltip>(Opcional) Rutas a añadir al PATH del sistema, separadas por punto y coma (;).</HelpTooltip></FormLabel>
+                                    <FormControl><Textarea placeholder="C:\\Ruta1;C:\\Ruta2" className="min-h-[100px] font-mono text-xs" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                    )}
 
-            {packageType === 'actualizacion_archivos' && (
-                <div className="space-y-6 animate-in fade-in">
-                    <h3 className="text-lg font-medium text-primary">Parámetros de Actualización de Archivos</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField control={form.control} name="updateFilePath" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center">Ruta de archivo comprimido<HelpTooltip>Ruta de red (UNC) al archivo .zip o .7z.</HelpTooltip></FormLabel>
-                                <FormControl><Input placeholder="\\\\servidor\\updates\\update.7z" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="installDir" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center">Directorio de instalación/destino<HelpTooltip>Carpeta en la PC cliente donde se copiarán los archivos.</HelpTooltip></FormLabel>
-                                <FormControl><Input placeholder="C:\\SoftlandERP" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="localUpdateDir" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center">Directorio de actualización local<HelpTooltip>Carpeta temporal en la PC cliente para extraer archivos.</HelpTooltip></FormLabel>
-                                <FormControl><Input placeholder="C:\\Temp\\Update" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="serviceName" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center">Nombres de servicios a detener<HelpTooltip>(Opcional) Lista de servicios de Windows a detener, separados por comas.</HelpTooltip></FormLabel>
-                                <FormControl><Input placeholder="Servicio1,Servicio POS" {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                    </div>
-                     <FormField control={form.control} name="environmentPath" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center">Rutas para variable de entorno PATH<HelpTooltip>(Opcional) Rutas a añadir al PATH del sistema, separadas por punto y coma (;).</HelpTooltip></FormLabel>
-                            <FormControl><Textarea placeholder="C:\\Ruta1;C:\\Ruta2" className="min-h-[100px] font-mono text-xs" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
+                    {packageType === 'ejecutar_script' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h3 className="text-lg font-medium text-primary">Parámetros de Ejecución de Script</h3>
+                            <FormField control={form.control} name="updateFilePath" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center">Ruta de red del script<HelpTooltip>Ruta de red completa (UNC) al archivo .bat o .ps1 que se ejecutará en la PC cliente.</HelpTooltip></FormLabel>
+                                    <FormControl><Input placeholder="\\\\servidor\\scripts\\instalar_programa.bat" {...field} /></FormControl>
+                                    <FormDescription>El agente descargará y ejecutará este script.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                    )}
+
+                    {packageType === 'comando_powershell' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <h3 className="text-lg font-medium text-primary">Parámetros de Comando PowerShell</h3>
+                            <FormField control={form.control} name="command" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center">Comando a ejecutar<HelpTooltip>El comando exacto que se ejecutará en una terminal de PowerShell en la PC cliente.</HelpTooltip></FormLabel>
+                                    <FormControl><Textarea placeholder="winget upgrade --all --accept-package-agreements" className="min-h-[120px] font-mono text-sm" {...field} /></FormControl>
+                                    <FormDescription>Ejemplos: `winget install Google.Chrome`, `gpupdate /force`.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                    )}
+
+                    {(packageType === 'actualizacion_archivos' || packageType === 'ejecutar_script') && (
+                        <>
+                            <Separator />
+                            <div className="space-y-6 animate-in fade-in">
+                                <h3 className="text-lg font-medium">Script Post-Ejecución (Opcional)</h3>
+                                 <FormField control={form.control} name="postInstallScript" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center">Script de PowerShell<HelpTooltip>Este script se ejecutará DESPUÉS de que la tarea principal (copiar archivos o ejecutar script) se complete con éxito.</HelpTooltip></FormLabel>
+                                        <FormControl>
+                                          <Textarea 
+                                            placeholder={`# Ejemplo para registrar componentes:
+# $ErrorActionPreference = "Stop"
+# regsvr32.exe /s C:\\SoftlandERP\\componente1.dll
+# & "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\RegAsm.exe" "C:\\SoftlandERP\\componente2.dll" /codebase /tlb`}
+                                            className="min-h-[200px] font-mono text-sm" 
+                                            {...field} />
+                                        </FormControl>
+                                        <FormDescription>Úsalo para tareas de limpieza, registro de componentes, iniciar servicios, etc.</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
-
-            {packageType === 'ejecutar_script' && (
-                 <div className="space-y-6 animate-in fade-in">
-                    <h3 className="text-lg font-medium text-primary">Parámetros de Ejecución de Script</h3>
-                    <FormField control={form.control} name="updateFilePath" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center">Ruta de red del script<HelpTooltip>Ruta de red completa (UNC) al archivo .bat o .ps1 que se ejecutará en la PC cliente.</HelpTooltip></FormLabel>
-                            <FormControl><Input placeholder="\\\\servidor\\scripts\\instalar_programa.bat" {...field} /></FormControl>
-                            <FormDescription>El agente descargará y ejecutará este script.</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                 </div>
-            )}
-
-            {packageType === 'comando_powershell' && (
-                <div className="space-y-6 animate-in fade-in">
-                    <h3 className="text-lg font-medium text-primary">Parámetros de Comando PowerShell</h3>
-                    <FormField control={form.control} name="command" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center">Comando a ejecutar<HelpTooltip>El comando exacto que se ejecutará en una terminal de PowerShell en la PC cliente.</HelpTooltip></FormLabel>
-                            <FormControl><Textarea placeholder="winget upgrade --all --accept-package-agreements" className="min-h-[120px] font-mono text-sm" {...field} /></FormControl>
-                             <FormDescription>Ejemplos: `winget install Google.Chrome`, `gpupdate /force`.</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                </div>
-            )}
-
-            {packageType === 'registro_componentes' && (
-                 <div className="space-y-6 animate-in fade-in">
-                    <h3 className="text-lg font-medium text-primary">Parámetros de Registro de Componentes</h3>
-                    <FormField control={form.control} name="updateFilePath" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center">Ruta de red del archivo XML de registro<HelpTooltip>Ruta de red completa (UNC) al archivo .xml que define los componentes a registrar.</HelpTooltip></FormLabel>
-                            <FormControl><Input placeholder="\\\\servidor\\share\\ERPReg.xml" {...field} /></FormControl>
-                            <FormDescription>El agente leerá este archivo y registrará los componentes listados.</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                 </div>
-            )}
-            </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-4">
               <Button type="button" variant="outline" onClick={() => router.back()}>

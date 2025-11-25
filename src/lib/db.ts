@@ -50,7 +50,8 @@ function runMigrations() {
                 installDir TEXT,
                 serviceName TEXT,
                 environmentPath TEXT,
-                command TEXT
+                command TEXT,
+                postInstallScript TEXT
             );
         `);
 
@@ -82,6 +83,16 @@ function runMigrations() {
             FOREIGN KEY (pcId) REFERENCES pcs(id) ON DELETE CASCADE
           );
         `);
+
+        // --- Migración para añadir postInstallScript si no existe ---
+        const tableInfo = db.prepare("PRAGMA table_info(packages)").all();
+        const columnExists = tableInfo.some(col => (col as any).name === 'postInstallScript');
+
+        if (!columnExists) {
+            console.log("Añadiendo columna 'postInstallScript' a la tabla 'packages'...");
+            db.exec('ALTER TABLE packages ADD COLUMN postInstallScript TEXT');
+        }
+
     })();
     console.log("Migraciones de base de datos verificadas/ejecutadas correctamente.");
 }
