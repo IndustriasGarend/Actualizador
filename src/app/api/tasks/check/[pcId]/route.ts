@@ -1,21 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { LATEST_AGENT_VERSION, defaultConfig } from '@/lib/data';
-import type { SystemConfig } from '@/lib/types';
-
-function getSystemConfig(): Omit<SystemConfig, 'adminUser' | 'adminPass'> {
-  const stmt = db.prepare('SELECT * FROM settings');
-  const rows = stmt.all() as { key: string; value: string }[];
-  
-  const configMap = rows.reduce((acc, row) => {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    acc[row.key] = row.value;
-    return acc;
-  }, {} as Record<string, string>);
-
-  return { ...defaultConfig, ...configMap };
-}
+import { LATEST_AGENT_VERSION } from '@/lib/data';
+import type { Package } from '@/lib/types';
 
 
 export async function POST(
@@ -26,17 +12,13 @@ export async function POST(
   const { agentVersion, pcName } = await request.json();
 
   try {
-    const config = getSystemConfig();
-
     // 0. Auto-registro de nuevas PCs
     const pcCheckStmt = db.prepare("SELECT id FROM pcs WHERE id = ?");
     const existingPc = pcCheckStmt.get(pcId);
     if (!existingPc) {
         const insertStmt = db.prepare("INSERT INTO pcs (id, name, status) VALUES (?, ?, 'Actualizado')");
-        // Usar pcId (hostname) tanto para id como para name
         insertStmt.run(pcId, pcName || pcId);
     }
-
 
     // 1. Detección de agente desactualizado (MÁXIMA PRIORIDAD)
     if (agentVersion !== LATEST_AGENT_VERSION) {
@@ -56,20 +38,28 @@ export async function POST(
     }
 
     // 3. Búsqueda de tareas de actualización pendientes
-    const stmt = db.prepare("SELECT id FROM tasks WHERE pcId = ? AND status = 'pendiente' ORDER BY createdAt DESC LIMIT 1");
-    const task = stmt.get(pcId);
+    const taskStmt = db.prepare("SELECT id, packageId FROM tasks WHERE pcId = ? AND status = 'pendiente' ORDER BY createdAt DESC LIMIT 1");
+    const task = taskStmt.get(pcId) as { id: number; packageId: number } | undefined;
 
     if (task) {
-      // Devolver la tarea junto con la configuración actual
+      const packageStmt = db.prepare("SELECT * FROM packages WHERE id = ?");
+      const pkg = packageStmt.get(task.packageId) as Package | undefined;
+      
+      if (!pkg) {
+        // Marcar tarea como errónea si el paquete no existe
+        db.prepare("UPDATE tasks SET status = 'error' WHERE id = ?").run(task.id);
+        return NextResponse.json({ task: 'ninguna' });
+      }
+
       return NextResponse.json({ 
         task: 'actualizar', 
         taskId: task.id,
         config: {
-          updateFilePath: config.updateFilePath,
-          localUpdateDir: config.localUpdateDir,
-          softlandInstallDir: config.softlandInstallDir,
-          serviceName: config.serviceName,
-          environmentPath: config.environmentPath,
+          updateFilePath: pkg.updateFilePath,
+          localUpdateDir: pkg.localUpdateDir,
+          softlandInstallDir: pkg.installDir,
+          serviceName: pkg.serviceName,
+          environmentPath: pkg.environmentPath,
         }
       });
     }

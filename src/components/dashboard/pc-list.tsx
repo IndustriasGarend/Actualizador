@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { PC } from '@/lib/types';
+import type { PC, Package } from '@/lib/types';
 import { ServerCrash } from 'lucide-react';
 import { PcCard } from '@/components/dashboard/pc-card';
 import { UpdateModal } from '@/components/dashboard/update-modal';
@@ -21,28 +21,28 @@ import { buttonVariants } from "@/components/ui/button";
 
 interface PcListProps {
   initialPcs: PC[];
+  packages: Package[];
 }
 
-export function PcList({ initialPcs }: PcListProps) {
+export function PcList({ initialPcs, packages }: PcListProps) {
   const [pcs, setPcs] = useState<PC[]>(initialPcs);
-  const [selectedPcForUpdate, setSelectedPcForUpdate] = useState<PC | null>(null);
+  const [taskData, setTaskData] = useState<{pc: PC, packageId: number} | null>(null);
   const [selectedPcForEdit, setSelectedPcForEdit] = useState<PC | null>(null);
   const [pcToDelete, setPcToDelete] = useState<PC | null>(null);
 
-  const handleUpdate = (pc: PC) => {
-    setSelectedPcForUpdate(pc);
+  const handleUpdate = (pc: PC, packageId: number) => {
+    setTaskData({ pc, packageId });
   };
 
   const handleCloseUpdateModal = () => {
-    setSelectedPcForUpdate(null);
-    // Simple refresh to get new data after modal closes. For a real-time app, this would be a websocket.
+    setTaskData(null);
     window.location.reload();
   };
 
   const handleUpdateComplete = (pcId: string, status: PC['status'], taskId?: number | null) => {
     setPcs(pcs.map(p => p.id === pcId ? { ...p, status, lastUpdate: new Date().toISOString(), currentTaskId: taskId || p.currentTaskId } : p));
     if (status !== 'En progreso') {
-      setSelectedPcForUpdate(null);
+      setTaskData(null);
     }
   };
 
@@ -76,7 +76,6 @@ export function PcList({ initialPcs }: PcListProps) {
   };
 
   const handleTogglePcStatus = (pc: PC) => {
-    // This is a UI-only simulation. A real implementation would call an API.
     const newStatus = pc.status === 'Deshabilitado' ? 'Pendiente' : 'Deshabilitado';
     setPcs(pcs.map(p => p.id === pc.id ? { ...p, status: newStatus } : p));
     toast({
@@ -102,14 +101,15 @@ export function PcList({ initialPcs }: PcListProps) {
           <PcCard
             key={pc.id}
             pc={pc}
-            onUpdateClick={() => handleUpdate(pc)}
+            packages={packages}
+            onUpdateClick={(packageId) => handleUpdate(pc, packageId)}
             onEditClick={() => setSelectedPcForEdit(pc)}
             onDeleteClick={() => setPcToDelete(pc)}
             onToggleStatus={() => handleTogglePcStatus(pc)}
           />
         ))}
       </div>
-      {selectedPcForUpdate && <UpdateModal pc={selectedPcForUpdate} onClose={handleCloseUpdateModal} onUpdateComplete={handleUpdateComplete} />}
+      {taskData && <UpdateModal pc={taskData.pc} packageId={taskData.packageId} onClose={handleCloseUpdateModal} onUpdateComplete={handleUpdateComplete} />}
       {selectedPcForEdit && <EditPcModal pc={selectedPcForEdit} onClose={() => setSelectedPcForEdit(null)} onSave={handleEditComplete} />}
       <AlertDialog open={pcToDelete !== null} onOpenChange={() => setPcToDelete(null)}>
         <AlertDialogContent>

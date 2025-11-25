@@ -8,6 +8,7 @@ import {
   History,
   Rocket,
   LifeBuoy,
+  Package,
 } from 'lucide-react';
 import {
   SidebarContent,
@@ -24,7 +25,7 @@ export function MainSidebar() {
 
   const menuItems = [
     { href: '/', label: 'Panel', icon: Computer },
-    { href: '/configuracion', label: 'Configuración', icon: Settings },
+    { href: '/paquetes', label: 'Paquetes', icon: Package },
     { href: '/historial', label: 'Historial', icon: History },
   ];
 

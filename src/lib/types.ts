@@ -39,12 +39,13 @@ export interface LogEntry {
   versionId?: string | null;
 }
 
-export interface SystemConfig {
-    updateFilePath: string;
-    localUpdateDir: string;
-    softlandInstallDir: string;
-    serviceName: string;
-    adminUser: string;
-    adminPass: string;
-    environmentPath: string;
+export interface Package {
+  id: number;
+  name: string;
+  description: string | null;
+  updateFilePath: string;
+  localUpdateDir: string;
+  installDir: string;
+  serviceName: string;
+  environmentPath: string | null;
 }

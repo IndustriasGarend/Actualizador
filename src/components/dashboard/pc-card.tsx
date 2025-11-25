@@ -29,15 +29,21 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
+  PackageCheck,
+  ChevronDown,
 } from 'lucide-react';
-import type { PC } from '@/lib/types';
+import type { PC, Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ClientFormattedDate } from '@/components/shared/client-formatted-date';
 import { LATEST_AGENT_VERSION } from '@/lib/data';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { useState } from 'react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 
 interface PcCardProps {
   pc: PC;
-  onUpdateClick: () => void;
+  packages: Package[];
+  onUpdateClick: (packageId: number) => void;
   onEditClick: () => void;
   onDeleteClick: () => void;
   onToggleStatus: () => void;
@@ -82,12 +88,15 @@ const InfoItem = ({
 
 export function PcCard({
   pc,
+  packages,
   onUpdateClick,
   onEditClick,
   onDeleteClick,
   onToggleStatus,
 }: PcCardProps) {
+  const [open, setOpen] = useState(false)
   const isAgentOutdated = pc.agentVersion && pc.agentVersion !== LATEST_AGENT_VERSION;
+  const isDisabled = pc.status === 'En progreso' || pc.status === 'Deshabilitado';
 
   return (
     <Card className="flex flex-col">
@@ -146,13 +155,38 @@ export function PcCard({
         />
       </CardContent>
       <CardFooter>
-        <Button
-          onClick={onUpdateClick}
-          className="w-full"
-          disabled={pc.status === 'En progreso' || pc.status === 'Deshabilitado'}
-        >
-          Actualizar Ahora
-        </Button>
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button className="w-full" disabled={isDisabled}>
+                    <PackageCheck className="mr-2 h-4 w-4" />
+                    Actualizar / Instalar
+                    <ChevronDown className="ml-auto h-4 w-4" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="start">
+                 <Command>
+                    <CommandInput placeholder="Buscar paquete..." />
+                    <CommandList>
+                        <CommandEmpty>No se encontraron paquetes.</CommandEmpty>
+                        <CommandGroup>
+                            {packages.map((pkg) => (
+                                <CommandItem
+                                    key={pkg.id}
+                                    value={pkg.name}
+                                    onSelect={() => {
+                                        onUpdateClick(pkg.id);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <PackageCheck className="mr-2 h-4 w-4" />
+                                    {pkg.name}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
       </CardFooter>
     </Card>
   );

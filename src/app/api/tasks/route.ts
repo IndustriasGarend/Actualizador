@@ -3,13 +3,13 @@ import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
-    const { pcId } = await request.json();
-    if (!pcId) {
-      return NextResponse.json({ message: 'pcId es requerido' }, { status: 400 });
+    const { pcId, packageId } = await request.json();
+    if (!pcId || !packageId) {
+      return NextResponse.json({ message: 'pcId y packageId son requeridos' }, { status: 400 });
     }
 
-    const stmt = db.prepare("INSERT INTO tasks (pcId, status) VALUES (?, 'pendiente')");
-    const result = stmt.run(pcId);
+    const stmt = db.prepare("INSERT INTO tasks (pcId, packageId, status) VALUES (?, ?, 'pendiente')");
+    const result = stmt.run(pcId, packageId);
     const newTaskId = result.lastInsertRowid;
 
     // Actualizar inmediatamente el estado de la PC a 'Pendiente' y guardar el ID de la tarea actual
