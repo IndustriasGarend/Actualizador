@@ -1,5 +1,11 @@
+/**
+ * @fileOverview HistoryTable component
+ * 
+ * Este componente es responsable de renderizar una tabla con los registros (logs) del sistema.
+ * Es reutilizable y se utiliza tanto en la página de Historial general como en la página de detalles de una PC específica.
+ * Maneja la presentación de fechas en la zona horaria del cliente a través del componente ClientFormattedDate.
+ */
 'use client';
-import { useEffect, useState } from 'react';
 
 import {
   Table,
@@ -11,29 +17,16 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import type { LogEntry } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileText, GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ClientFormattedDate } from '@/components/shared/client-formatted-date';
 
 interface HistoryTableProps {
   logs: LogEntry[];
 }
 
-function ClientFormattedDate({ dateString }: { dateString: string | null }) {
-  const [formattedDate, setFormattedDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (dateString) {
-      setFormattedDate(new Date(dateString).toLocaleString('es-ES'));
-    }
-  }, [dateString]);
-
-  return <>{formattedDate || dateString}</>;
-}
-
-
 export function HistoryTable({ logs }: HistoryTableProps) {
-
     if (logs.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center p-8 border-2 border-dashed rounded-lg bg-card">
