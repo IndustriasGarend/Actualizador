@@ -1,24 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle, Edit, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { useState } from 'react';
 import type { PC } from '@/lib/types';
-import { UpdateModal } from './update-modal';
-import { EditPcModal } from './edit-pc-modal';
-import { cn } from '@/lib/utils';
-import { LATEST_AGENT_VERSION } from '@/lib/data';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
+import { ServerCrash } from 'lucide-react';
+import { PcCard } from '@/components/dashboard/pc-card';
+import { UpdateModal } from '@/components/dashboard/update-modal';
+import { EditPcModal } from '@/components/dashboard/edit-pc-modal';
+import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,35 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from '@/hooks/use-toast';
-
-
-function ClientFormattedDate({ dateString }: { dateString: string | null }) {
-  // This prevents hydration mismatch.
-  // The server will render the raw string or "Nunca".
-  // The client will render the formatted date on its initial render.
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  if (!dateString) {
-    return <>Nunca</>;
-  }
-
-  if (!isClient) {
-    // Render a placeholder or the raw date string on the server
-    return <>{dateString}</>;
-  }
-
-  // Format the date only on the client
-  const date = new Date(dateString);
-  const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-  const correctedDate = new Date(date.getTime() + userTimezoneOffset);
-  const formattedDate = correctedDate.toLocaleString('es-ES', { timeZone: 'UTC' });
-  
-  return <>{formattedDate}</>;
-}
+import { buttonVariants } from "@/components/ui/button";
 
 interface PcListProps {
   initialPcs: PC[];
@@ -68,33 +28,28 @@ export function PcList({ initialPcs }: PcListProps) {
   const [selectedPcForUpdate, setSelectedPcForUpdate] = useState<PC | null>(null);
   const [selectedPcForEdit, setSelectedPcForEdit] = useState<PC | null>(null);
   const [pcToDelete, setPcToDelete] = useState<PC | null>(null);
-  const router = useRouter();
 
   const handleUpdate = (pc: PC) => {
     setSelectedPcForUpdate(pc);
   };
-  
+
   const handleCloseUpdateModal = () => {
     setSelectedPcForUpdate(null);
-    // Forzar la actualización del router para obtener nuevos datos
-    router.refresh();
-  };
-  
-  const handleCloseEditModal = () => {
-    setSelectedPcForEdit(null);
+    // Simple refresh to get new data after modal closes. For a real-time app, this would be a websocket.
+    window.location.reload();
   };
 
   const handleUpdateComplete = (pcId: string, status: PC['status'], taskId?: number | null) => {
-    setPcs(pcs.map(p => p.id === pcId ? {...p, status, lastUpdate: new Date().toISOString(), currentTaskId: taskId || p.currentTaskId} : p));
+    setPcs(pcs.map(p => p.id === pcId ? { ...p, status, lastUpdate: new Date().toISOString(), currentTaskId: taskId || p.currentTaskId } : p));
     if (status !== 'En progreso') {
-        setSelectedPcForUpdate(null);
+      setSelectedPcForUpdate(null);
     }
   };
 
   const handleEditComplete = (updatedPc: PC) => {
     setPcs(pcs.map(p => p.id === updatedPc.id ? updatedPc : p));
     setSelectedPcForEdit(null);
-  }
+  };
 
   const handleDeletePc = async () => {
     if (!pcToDelete) return;
@@ -120,163 +75,43 @@ export function PcList({ initialPcs }: PcListProps) {
     }
   };
 
-  const handleTogglePcStatus = async (pc: PC) => {
+  const handleTogglePcStatus = (pc: PC) => {
+    // This is a UI-only simulation. A real implementation would call an API.
     const newStatus = pc.status === 'Deshabilitado' ? 'Pendiente' : 'Deshabilitado';
-    try {
-      // Esta API no existe todavía, pero la lógica del cliente está aquí
-      // const response = await fetch(`/api/pcs/${pc.id}/status`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ status: newStatus }),
-      // });
-      // if (!response.ok) {
-      //   throw new Error(`No se pudo ${newStatus === 'Deshabilitado' ? 'deshabilitar' : 'habilitar'} la PC.`);
-      // }
-      // Para simular el cambio en la UI:
-      setPcs(pcs.map(p => p.id === pc.id ? { ...p, status: newStatus } : p));
-      toast({
-        title: `PC ${newStatus === 'Deshabilitado' ? 'Deshabilitada' : 'Habilitada'}`,
-        description: `La PC ${pc.name} ha sido ${newStatus === 'Deshabilitado' ? 'deshabilitada' : 'habilitada'}.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: (error as Error).message,
-        variant: 'destructive',
-      });
-    }
+    setPcs(pcs.map(p => p.id === pc.id ? { ...p, status: newStatus } : p));
+    toast({
+      title: `PC ${newStatus === 'Deshabilitado' ? 'Deshabilitada' : 'Habilitada'}`,
+      description: `La PC ${pc.name} ha sido ${newStatus === 'Deshabilitado' ? 'deshabilitada' : 'habilitada'}.`,
+    });
   };
 
   if (pcs.length === 0) {
     return (
-        <div className="flex flex-col items-center justify-center h-full text-center p-8 border-2 border-dashed rounded-lg bg-card">
-            <ServerCrash className="w-16 h-16 text-muted-foreground" />
-            <h2 className="mt-4 text-xl font-semibold">No se encontraron PCs</h2>
-            <p className="mt-2 text-muted-foreground">Aún no se ha registrado ninguna PC. Instale el agente en un equipo cliente para que aparezca aquí automáticamente.</p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-full text-center p-8 border-2 border-dashed rounded-lg bg-card">
+        <ServerCrash className="w-16 h-16 text-muted-foreground" />
+        <h2 className="mt-4 text-xl font-semibold">No se encontraron PCs</h2>
+        <p className="mt-2 text-muted-foreground">Aún no se ha registrado ninguna PC. Instale el agente en un equipo cliente para que aparezca aquí automáticamente.</p>
+      </div>
     );
   }
 
   return (
     <>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {pcs.map((pc) => {
-          const isEnabled = pc.status !== 'Deshabilitado';
-          const isAgentOutdated = pc.agentVersion && pc.agentVersion !== LATEST_AGENT_VERSION;
-          return (
-            <Card key={pc.id} className={cn("flex flex-col hover:shadow-lg transition-shadow duration-300", !isEnabled && "bg-muted/50")}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <Computer className={cn("w-8 h-8 text-muted-foreground", !isEnabled && "text-muted-foreground/50")} />
-                  <div className="flex items-center gap-1">
-                    <Badge variant={
-                        pc.status === 'Error' ? 'destructive' : 
-                        pc.status === 'Cancelado' ? 'secondary' :
-                        pc.status === 'Pendiente' ? 'secondary' :
-                        pc.status === 'Deshabilitado' ? 'secondary' :
-                        'default'
-                      } className={cn(
-                        'text-xs',
-                        pc.status === 'Actualizado' && 'bg-accent text-accent-foreground hover:bg-accent/80',
-                        pc.status === 'En progreso' && 'bg-primary/80 animate-pulse',
-                        pc.status === 'Cancelado' && 'bg-yellow-500 text-white',
-                        pc.status === 'Deshabilitado' && 'bg-slate-500 text-white'
-                      )}>
-                        {pc.status === 'Cancelado' && <Ban className="w-3 h-3 mr-1.5" />}
-                        {pc.status}
-                    </Badge>
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                           <DropdownMenuItem onClick={() => setSelectedPcForEdit(pc)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                <span>Editar</span>
-                            </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTogglePcStatus(pc)}>
-                            {isEnabled ? (
-                              <><ToggleLeft className="mr-2 h-4 w-4" /><span>Deshabilitar</span></>
-                            ) : (
-                              <><ToggleRight className="mr-2 h-4 w-4" /><span>Habilitar</span></>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setPcToDelete(pc)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Eliminar</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-                </div>
-                <CardTitle className="pt-2">
-                    <Link href={`/pcs/${pc.id}`} className="hover:underline">
-                        {pc.name}
-                    </Link>
-                </CardTitle>
-                <CardDescription>Última IP: {pc.ip || 'Desconocida'}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow space-y-4">
-                <div className="space-y-1 text-sm">
-                   {pc.alias && (
-                        <div className="text-muted-foreground flex items-center gap-2">
-                            <UserCircle className="w-4 h-4" />
-                            <p>{pc.alias}</p>
-                        </div>
-                    )}
-                    {pc.loggedUser && (
-                        <div className="text-muted-foreground flex items-center gap-2">
-                            <UserCircle className="w-4 h-4" />
-                            <p>Usuario: <span className="font-medium text-foreground/80">{pc.loggedUser}</span></p>
-                        </div>
-                    )}
-                    {pc.location && (
-                        <div className="text-muted-foreground flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            <p>{pc.location}</p>
-                        </div>
-                    )}
-                </div>
-                <div className="text-sm text-muted-foreground border-t pt-4">
-                  <p>Última actualización:</p>
-                  <p className="font-medium text-foreground/80">
-                    <ClientFormattedDate dateString={pc.lastUpdate} />
-                  </p>
-                </div>
-                <div className="space-y-1 text-sm">
-                    {pc.versionId && (
-                        <div className="text-muted-foreground flex items-center gap-2">
-                            <GitBranch className="w-4 h-4" />
-                            <p>Versión App: <span className="font-medium text-foreground/80">{pc.versionId}</span></p>
-                        </div>
-                    )}
-                     {pc.agentVersion && (
-                        <div className="text-muted-foreground flex items-center gap-2">
-                            <RefreshCw className="w-4 h-4" />
-                            <p>Versión Agente: <span className={cn("font-medium text-foreground/80", isAgentOutdated && "text-red-500 font-bold")}>{pc.agentVersion}</span></p>
-                        </div>
-                    )}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={() => handleUpdate(pc)} 
-                  disabled={pc.status === 'En progreso' || !isEnabled}
-                  className="w-full"
-                >
-                  Actualizar Ahora
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
+        {pcs.map((pc) => (
+          <PcCard
+            key={pc.id}
+            pc={pc}
+            onUpdateClick={() => handleUpdate(pc)}
+            onEditClick={() => setSelectedPcForEdit(pc)}
+            onDeleteClick={() => setPcToDelete(pc)}
+            onToggleStatus={() => handleTogglePcStatus(pc)}
+          />
+        ))}
       </div>
       {selectedPcForUpdate && <UpdateModal pc={selectedPcForUpdate} onClose={handleCloseUpdateModal} onUpdateComplete={handleUpdateComplete} />}
-      {selectedPcForEdit && <EditPcModal pc={selectedPcForEdit} onClose={handleCloseEditModal} onSave={handleEditComplete} />}
-       <AlertDialog open={pcToDelete !== null} onOpenChange={() => setPcToDelete(null)}>
+      {selectedPcForEdit && <EditPcModal pc={selectedPcForEdit} onClose={() => setSelectedPcForEdit(null)} onSave={handleEditComplete} />}
+      <AlertDialog open={pcToDelete !== null} onOpenChange={() => setPcToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro de que deseas eliminar esta PC?</AlertDialogTitle>
