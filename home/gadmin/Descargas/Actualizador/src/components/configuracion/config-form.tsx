@@ -19,11 +19,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 import type { SystemConfig } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { Textarea } from '../ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { HelpTooltip } from '@/components/shared/help-tooltip';
 
 const formSchema = z.object({
@@ -42,7 +42,6 @@ interface ConfigFormProps {
 
 export function ConfigForm({ initialConfig }: ConfigFormProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

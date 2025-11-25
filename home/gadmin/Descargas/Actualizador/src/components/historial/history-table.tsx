@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import type { LogEntry } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileText, GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ClientFormattedDate } from '@/components/shared/client-formatted-date';

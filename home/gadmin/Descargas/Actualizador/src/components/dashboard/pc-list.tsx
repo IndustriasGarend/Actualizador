@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import type { PC } from '@/lib/types';
-import { UpdateModal } from './update-modal';
-import { EditPcModal } from './edit-pc-modal';
+import { UpdateModal } from '@/components/dashboard/update-modal';
+import { EditPcModal } from '@/components/dashboard/edit-pc-modal';
 import { ClientFormattedDate } from '@/components/shared/client-formatted-date';
 import { cn } from '@/lib/utils';
 import { LATEST_AGENT_VERSION } from '@/lib/data';
