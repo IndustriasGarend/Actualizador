@@ -20,6 +20,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useRouter } from 'next/navigation';
 import { BulkImportModal } from './bulk-import-modal';
+import { PackageSelector } from './package-selector';
 
 interface PcListProps {
   initialPcs: PC[];
@@ -33,6 +34,7 @@ export function PcList({ initialPcs, packages }: PcListProps) {
   const [selectedPcForEdit, setSelectedPcForEdit] = useState<PC | null>(null);
   const [pcToDelete, setPcToDelete] = useState<PC | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
 
 
   const handleUpdate = (pc: PC, packageId: number) => {
@@ -98,7 +100,7 @@ export function PcList({ initialPcs, packages }: PcListProps) {
     router.refresh();
   }
 
-  if (pcs.length === 0) {
+  if (pcs.length === 0 && !isImporting) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8 border-2 border-dashed rounded-lg bg-card">
         <ServerCrash className="w-16 h-16 text-muted-foreground" />
@@ -108,14 +110,14 @@ export function PcList({ initialPcs, packages }: PcListProps) {
           <FileUp className="mr-2 h-4 w-4" />
           Importar desde CSV
         </Button>
-         {isImporting && <BulkImportModal onClose={() => setIsImporting(false)} onImportSuccess={handleImportSuccess} />}
       </div>
     );
   }
 
   return (
     <>
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex justify-between items-center gap-4">
+        <PackageSelector packages={packages} onPackageSelect={setSelectedPackage} />
         <Button onClick={() => setIsImporting(true)}>
           <FileUp className="mr-2 h-4 w-4" />
           Importar desde CSV
@@ -123,17 +125,31 @@ export function PcList({ initialPcs, packages }: PcListProps) {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {pcs.map((pc) => (
-          <PcCard
-            key={pc.id}
-            pc={pc}
-            packages={packages}
-            onUpdateClick={(packageId) => handleUpdate(pc, packageId)}
-            onEditClick={() => setSelectedPcForEdit(pc)}
-            onDeleteClick={() => confirmDelete(pc)}
-            onToggleStatus={() => handleTogglePcStatus(pc)}
-          />
-        ))}
+        {pcs.map((pc) => {
+            let highlight: 'none' | 'match' | 'mismatch' = 'none';
+            if (selectedPackage && selectedPackage.version && pc.versionId) {
+                if (pc.versionId === selectedPackage.version) {
+                    highlight = 'match';
+                } else {
+                    highlight = 'mismatch';
+                }
+            } else if (selectedPackage && selectedPackage.version && !pc.versionId) {
+                 highlight = 'mismatch';
+            }
+
+            return (
+              <PcCard
+                key={pc.id}
+                pc={pc}
+                packages={packages}
+                onUpdateClick={(packageId) => handleUpdate(pc, packageId)}
+                onEditClick={() => setSelectedPcForEdit(pc)}
+                onDeleteClick={() => confirmDelete(pc)}
+                onToggleStatus={() => handleTogglePcStatus(pc)}
+                highlight={highlight}
+              />
+            )
+        })}
       </div>
       {taskData && <UpdateModal pc={taskData.pc} packageId={taskData.packageId} onClose={handleCloseUpdateModal} onUpdateComplete={handleUpdateComplete} />}
       {selectedPcForEdit && <EditPcModal pc={selectedPcForEdit} onClose={() => setSelectedPcForEdit(null)} onSave={handleEditComplete} />}

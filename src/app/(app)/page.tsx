@@ -3,6 +3,7 @@ import { PcList } from '@/components/dashboard/pc-list';
 import { Suspense } from 'react';
 import { db } from '@/lib/db';
 import type { PC, Package } from '@/lib/types';
+import { PackageSelector } from '@/components/dashboard/package-selector';
 
 async function getPcs(): Promise<PC[]> {
   try {

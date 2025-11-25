@@ -31,6 +31,8 @@ import {
   ToggleRight,
   PackageCheck,
   ChevronDown,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 import type { PC, Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -43,6 +45,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 interface PcCardProps {
   pc: PC;
   packages: Package[];
+  highlight: 'none' | 'match' | 'mismatch';
   onUpdateClick: (packageId: number) => void;
   onEditClick: () => void;
   onDeleteClick: () => void;
@@ -89,6 +92,7 @@ const InfoItem = ({
 export function PcCard({
   pc,
   packages,
+  highlight,
   onUpdateClick,
   onEditClick,
   onDeleteClick,
@@ -98,11 +102,17 @@ export function PcCard({
   const isAgentOutdated = pc.agentVersion && pc.agentVersion !== LATEST_AGENT_VERSION;
   const isDisabled = pc.status === 'En progreso' || pc.status === 'Deshabilitado';
 
+  const highlightStyles = {
+    match: 'border-green-500 border-2 shadow-lg',
+    mismatch: 'border-yellow-500 border-2 shadow-lg',
+    none: '',
+  };
+
   return (
-    <Card className="flex flex-col">
+    <Card className={cn('flex flex-col transition-all', highlightStyles[highlight])}>
       <CardHeader className="flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle className="text-xl">
+        <div className='flex-1 min-w-0'>
+          <CardTitle className="text-xl truncate">
             <Link href={`/pcs/${pc.id}`} className="hover:underline">
               {pc.name}
             </Link>
@@ -111,7 +121,9 @@ export function PcCard({
             <ClientFormattedDate dateString={pc.lastUpdate} />
           </CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {highlight === 'match' && <CheckCircle className="h-5 w-5 text-green-500" />}
+          {highlight === 'mismatch' && <AlertTriangle className="h-5 w-5 text-yellow-500" />}
           <Badge className={cn('text-xs', getStatusStyles(pc.status))}>
             {pc.status}
           </Badge>
