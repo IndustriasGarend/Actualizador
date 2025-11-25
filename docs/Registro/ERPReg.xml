@@ -14,7 +14,7 @@
 	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CN" CLSID="" Typelib="" Interface="">Softland.ERP.CN.Modulo</COMPONENTE>
 	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CO" CLSID="" Typelib="" Interface="">Softland.ERP.CO.Modulo</COMPONENTE>
 	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CP" CLSID="" Typelib="" Interface="">Softland.ERP.CP.Modulo</COMPONENTE>
-	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CR" CLSID="" Typelib="" Interface="">Softland.ERP.CR.Modulo</COMPONENTE>
+	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CR" CLSID="" Typelib="" Interface="">Softland.ERP.CR.Modulo</COMPONente>
 	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="CV" CLSID="" Typelib="" Interface="">Softland.ERP.CV.Modulo</COMPONENTE>
 	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="EV" CLSID="" Typelib="" Interface="">Softland.ERP.EV.Modulo</COMPONENTE>
 	<COMPONENTE Tipo="COMEXE" Area="Modulo" Nombre="FA" CLSID="" Typelib="" Interface="">Softland.ERP.FA.Modulo</COMPONENTE>

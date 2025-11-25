@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script para instalar y configurar el servidor de Softland Updater.
+# Script para instalar y configurar el servidor de Clic Actualizador Tools.
 # Asume que Node.js y npm están preinstalados.
 
 # Colores para la salida
@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}=== Iniciando Instalación del Servidor Softland Updater ===${NC}"
+echo -e "${GREEN}=== Iniciando Instalación del Servidor Clic Actualizador Tools ===${NC}"
 
 # --- Paso 1: Verificar prerrequisitos ---
 echo -e "\n${YELLOW}[1/6] Verificando prerrequisitos...${NC}"
@@ -55,7 +55,7 @@ else
 fi
 
 # --- Paso 5: Iniciar la aplicación con PM2 ---
-APP_NAME="softland-updater-server"
+APP_NAME="clic-actualizador-server"
 echo -e "\n${YELLOW}[5/6] Iniciando la aplicación con PM2...${NC}"
 
 # Detener cualquier instancia previa con el mismo nombre
@@ -75,7 +75,7 @@ echo -e "\n${YELLOW}[6/6] Configurando PM2 para reinicio automático...${NC}"
 pm2 save
 if pm2 startup; then
     echo -e "${GREEN}¡Instalación completada!${NC}"
-    echo "El servidor Softland Updater está ahora en ejecución y se reiniciará automáticamente."
+    echo "El servidor Clic Actualizador Tools está ahora en ejecución y se reiniciará automáticamente."
 else
     echo -e "${YELLOW}Advertencia: No se pudo configurar el inicio automático de PM2. Puede que necesites ejecutar el comando que PM2 te sugiera con permisos de superusuario.${NC}"
 fi

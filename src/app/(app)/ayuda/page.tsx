@@ -134,28 +134,30 @@ export default function HelpPage() {
   const [activeItem, setActiveItem] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (searchTerm) {
-        const firstMatch = helpSections.find(section => {
-            const searchTerms = normalizeText(searchTerm).split(" ").filter(Boolean);
-            if (searchTerms.length === 0) return false;
-            const contentString = (title: string, content: React.ReactNode) => {
-                 const getText = (node: React.ReactNode): string => {
-                    if (typeof node === "string") return node;
-                    if (Array.isArray(node)) return node.map(getText).join(" ");
-                    if (typeof node === "object" && node !== null && "props" in node && node.props.children) {
-                        return getText(node.props.children);
-                    }
-                    return "";
-                };
-                return title + " " + getText(content);
-            }
-            const targetText = normalizeText(contentString(section.title, section.content));
-            return searchTerms.every((term) => targetText.includes(term));
-        });
-        setActiveItem(firstMatch?.title);
-    } else {
+    if (!searchTerm) {
         setActiveItem(undefined);
+        return;
     }
+    
+    const firstMatch = helpSections.find(section => {
+        const searchTerms = normalizeText(searchTerm).split(" ").filter(Boolean);
+        if (searchTerms.length === 0) return false;
+        const contentString = (title: string, content: React.ReactNode) => {
+             const getText = (node: React.ReactNode): string => {
+                if (typeof node === "string") return node;
+                if (Array.isArray(node)) return node.map(getText).join(" ");
+                if (typeof node === "object" && node !== null && "props" in node && node.props.children) {
+                    return getText(node.props.children);
+                }
+                return "";
+            };
+            return title + " " + getText(content);
+        }
+        const targetText = normalizeText(contentString(section.title, section.content));
+        return searchTerms.every((term) => targetText.includes(term));
+    });
+
+    setActiveItem(firstMatch?.title);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
@@ -203,7 +205,7 @@ export default function HelpPage() {
                             <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden, pero el agente aún no la ha comenzado.</li>
                             <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente está ejecutando una tarea en este momento.</li>
                             <li><Badge variant="destructive">Error</Badge>: Ocurrió un problema durante la última tarea. Revisa el historial.</li>
-                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea fue cancelada manually.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea fue cancelada manualmente.</li>
                             <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC está inactiva y no recibirá nuevas tareas.</li>
                          </ul>
                     </li>
@@ -269,7 +271,8 @@ export default function HelpPage() {
                     <li>
                         <strong>Descargar el Paquete de Instalación:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>En la página de <strong>Ayuda</strong>, haz clic en el botón <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
+                            <li>En la página de <strong>Ayuda</strong> (esta misma página), haz clic en el botón <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
+                             <li>El paquete `.zip` ya incluye la URL de su servidor pre-configurada.</li>
                         </ul>
                     </li>
                     <li>
@@ -282,22 +285,15 @@ export default function HelpPage() {
                         <strong>Ejecutar el Instalador:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>Navega hasta la carpeta donde descomprimiste los archivos.</li>
-                            <li>Haz **clic derecho** en el archivo `install.bat` y selecciona **"Ejecutar como administrador"**.</li>
+                            <li>Haz **clic derecho** en el archivo `install-service.ps1` y selecciona **"Ejecutar con PowerShell"**.</li>
+                             <li>Si esta opción no aparece, abre una terminal de PowerShell como Administrador, navega a esta carpeta y ejecuta: `.\\install-service.ps1`</li>
                         </ul>
                     </li>
                     <li>
-                        <strong>Ingresar la URL del Servidor:</strong>
-                         <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>La consola te pedirá que ingreses la URL base de este servidor. Ejemplo: `http://192.168.1.100:9002`.</li>
-                             <li>Esta URL se guarda en un archivo `config.json` local para que el agente sepa a dónde comunicarse.</li>
-                        </ul>
-                    </li>
-                     <li>
                         <strong>Verificar la Instalación:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>
-                                Si todo sale bien, la consola mostrará un mensaje de "¡ÉXITO!". La ventana permanecerá abierta hasta que presiones una tecla.
-                             </li>
+                             <li>Acepta la solicitud de permisos de Administrador (UAC) si aparece.</li>
+                             <li>Si todo sale bien, la consola mostrará un mensaje de "¡ÉXITO!". La ventana permanecerá abierta hasta que presiones una tecla.</li>
                              <li>El nuevo servicio llamado `Clic Actualizador Tools Agent` se habrá instalado y estará ejecutándose con la cuenta `Sistema Local`.</li>
                         </ul>
                     </li>
@@ -307,7 +303,7 @@ export default function HelpPage() {
                     <AlertTitle>PASO MANUAL Y OBLIGATORIO: Configurar Credenciales de Red</AlertTitle>
                     <AlertDescription>
                        <div className="space-y-2">
-                        <p>Para que el agente pueda acceder a los archivos en carpetas compartidas de la red, debes cambiar la cuenta con la que se ejecuta.</p>
+                        <p>Para que el agente pueda acceder a los archivos en carpetas compartidas de la red, debes cambiar la cuenta con la que se ejecuta el servicio.</p>
                         <ol className="list-decimal pl-5 space-y-1">
                             <li>Abre la consola de Servicios de Windows (`services.msc`).</li>
                             <li>Busca el servicio <strong>"Clic Actualizador Tools Agent"</strong> y abre sus propiedades.</li>
@@ -328,7 +324,7 @@ export default function HelpPage() {
         content: (
             <div className="space-y-4">
                 <p>
-                Desde aquí puedes descargar el paquete de instalación genérico para el agente. Este mismo paquete `.zip` se utiliza para todas las PCs que desees registrar en el sistema.
+                Desde aquí puedes descargar el paquete de instalación genérico para el agente. Este mismo paquete `.zip` se utiliza para todas las PCs que desees registrar en el sistema. La URL de su servidor se incluirá automáticamente en el paquete.
                 </p>
                 <div className="flex justify-center pt-4">
                     <Button onClick={() => window.location.href = '/api/download-agent'}>
