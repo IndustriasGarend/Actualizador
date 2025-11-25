@@ -17,7 +17,7 @@ function getPackages(): Package[] {
   }
 }
 
-export default function PaquetesPage() {
+export default async function PaquetesPage() {
   const packages = getPackages();
 
   return (

@@ -4,12 +4,17 @@ import type { LogEntry } from '@/lib/types';
 import { db } from '@/lib/db';
 
 // Ahora, los datos se obtienen de la base de datos SQLite.
-function getLogs() {
-  const stmt = db.prepare('SELECT * FROM logs ORDER BY timestamp DESC');
-  return stmt.all() as LogEntry[];
+function getLogs(): LogEntry[] {
+  try {
+    const stmt = db.prepare('SELECT * FROM logs ORDER BY timestamp DESC');
+    return stmt.all() as LogEntry[];
+  } catch (error) {
+    console.error("Failed to fetch logs:", error);
+    return [];
+  }
 }
 
-export default function HistorialPage() {
+export default async function HistorialPage() {
   const logs = getLogs();
   
   return (

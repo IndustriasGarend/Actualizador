@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HardDrive, Cpu, MemoryStick, Save, Info } from 'lucide-react';
 import { HistoryTable } from '@/components/historial/history-table';
 
-function getPc(id: string) {
+function getPc(id: string): PC | undefined {
     const stmt = db.prepare('SELECT * FROM pcs WHERE id = ?');
     return stmt.get(id) as PC | undefined;
 }
