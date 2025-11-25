@@ -1,16 +1,12 @@
 @echo off
-cls
+REM Script para instalar el servicio del agente de Softland Updater
+
 echo Este script instalara el agente como un servicio de Windows.
 echo Se requeriran credenciales de administrador para configurar el servicio.
 echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {
-    $scriptPath = (Get-Item -Path '.').FullName
-    $installScript = Join-Path $scriptPath 'install-service.ps1'
 
-    if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
-        Start-Process powershell.exe -Verb RunAs -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File ""{0}""' -f $installScript)
-    } else {
-        & $installScript
-    }
-    Read-Host 'Presione Enter para cerrar esta ventana:'
-}"
+set "SCRIPT_PATH=%~dp0"
+set "POWERSHELL_SCRIPT_PATH=%SCRIPT_PATH%install-service.ps1"
+
+REM Ejecutar el script de PowerShell como administrador
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& {Start-Process powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""%POWERSHELL_SCRIPT_PATH%""' -Verb RunAs}" > NUL 2>&1
