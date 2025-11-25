@@ -1,111 +1,105 @@
-#Requires -RunAsAdministrator
-#Requires -Version 5.1
 
-<#
-.SYNOPSIS
-    Instalador del servicio para el Agente de Softland Updater.
-.DESCRIPTION
-    Este script desinstala cualquier version anterior del servicio, solicita las credenciales
-    necesarias, y luego instala e inicia la nueva version del servicio del agente.
-    Ademas, configura la recuperacion automatica en caso de fallo.
-.NOTES
-    Autor: Gemini
-#>
+# install-service.ps1.template
+# Este script se encarga de la lógica de instalación del servicio del agente.
 
-$ErrorActionPreference = "Stop"
+param (
+    [string]$ScriptPath
+)
 
-# --- Definicion de Variables ---
-$ScriptDir = $PSScriptRoot
+# Colores para la consola
+$SuccessColor = "Green"
+$ErrorColor = "Red"
+$InfoColor = "Yellow"
 
-# El nombre del equipo se convierte en el ID y parte del nombre del servicio
-$PcName = $env:COMPUTERNAME
-$ServiceName = "SoftlandUpdateAgent_" + ($PcName -replace '[^a-zA-Z0-9]', '')
-$ServiceDisplayName = "Softland Updater Agent ($PcName)"
-$ServiceDescription = "Agente para la gestion remota de actualizaciones de Softland ERP. Se comunica con el servidor central para ejecutar tareas."
+# --- Inicio del Bloque Try/Catch para manejo de errores ---
+try {
+    # Nombre del servicio
+    $serviceName = "SoftlandUpdaterAgent"
 
+    # Archivos del agente
+    $agentExecutable = Join-Path $ScriptPath "agent.ps1"
+    $configFile = Join-Path $ScriptPath "config.json"
 
-# --- Logica del Script ---
-
-Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
-
-# Desinstalar versiones anteriores del servicio si existen
-$existingService = Get-Service -Name "SoftlandUpdateAgent_*" -ErrorAction SilentlyContinue
-if ($existingService) {
-    Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
-    try {
-        Stop-Service -Name $existingService.Name -Force
-    } catch {
-        Write-Warning "No se pudo detener el servicio anterior (puede que ya estuviera detenido)."
+    # --- Desinstalación de versiones anteriores ---
+    Write-Host "Buscando versiones anteriores del servicio..." -ForegroundColor $InfoColor
+    $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if ($existingService) {
+        Write-Host "Se encontró un servicio existente. Deteniendo y eliminándolo..." -ForegroundColor $InfoColor
+        Stop-Service -Name $serviceName -Force
+        Get-Service -Name $serviceName | Remove-Service -Force
+        Write-Host "Servicio anterior eliminado." -ForegroundColor $SuccessColor
+        Start-Sleep -Seconds 2 # Pequeña pausa para asegurar la liberación de recursos
+    } else {
+        Write-Host "No se encontraron servicios anteriores."
     }
     
-    try {
-        $removeResult = Get-WmiObject -Class Win32_Service -Filter "Name='$($existingService.Name)'" | ForEach-Object { $_.Delete() }
-        if ($removeResult.ReturnValue -eq 0) {
-            Write-Host "Servicio anterior '$($existingService.Name)' desinstalado."
-        } else {
-            Write-Warning "No se pudo desinstalar el servicio anterior (codigo: $($removeResult.ReturnValue))."
+    # --- Creación del archivo de configuración (config.json) ---
+    if (-not (Test-Path $configFile)) {
+        Write-Host ""
+        $serverUrl = Read-Host "--> Por favor, ingresa la URL del servidor (ej. http://192.168.1.100:9002)"
+        # Validacion basica de la URL
+        if ($serverUrl -notlike "http*") {
+            throw "La URL ingresada no es valida. Debe comenzar con http o https."
         }
-        Start-Sleep -Seconds 3
-    } catch {
-        Write-Warning "No se pudo consultar WMI para eliminar el servicio. Puede que ya no existiera. Error: $($_.Exception.Message)"
+        $configContent = @{
+            serverUrl = $serverUrl
+        } | ConvertTo-Json
+        Set-Content -Path $configFile -Value $configContent
+        Write-Host "Archivo de configuracion 'config.json' creado." -ForegroundColor $SuccessColor
+    } else {
+        Write-Host "El archivo 'config.json' ya existe. Omitiendo la solicitud de URL." -ForegroundColor $InfoColor
     }
-}
 
-# Solicitar la URL del servidor
-$ServerUrl = Read-Host -Prompt "Por favor, ingrese la URL del servidor (ej: http://192.168.1.100:9002)"
-if (-not ($ServerUrl -match "^https?://")) {
-    Write-Error "La URL ingresada no es valida. Debe comenzar con http:// o https://"
-    exit 1
-}
+    # --- Solicitud de credenciales para el servicio ---
+    Write-Host ""
+    Write-Host "--> Se necesitan las credenciales de una cuenta con permisos para ejecutar el servicio." -ForegroundColor $InfoColor
+    Write-Host "    Esta cuenta debe tener acceso de administrador local y a las rutas de red."
+    $credential = Get-Credential -UserName "DOMINIO\usuario" -Message "Ingresa la cuenta y contrasena para el servicio"
 
+    # --- Creación del nuevo servicio ---
+    Write-Host ""
+    Write-Host "Creando el nuevo servicio '$serviceName'..." -ForegroundColor $InfoColor
+    New-Service -Name $serviceName `
+                -BinaryPathName "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$agentExecutable`"" `
+                -DisplayName "Softland Updater Agent" `
+                -Description "Agente que se comunica con el panel central para ejecutar actualizaciones de Softland." `
+                -StartupType Automatic
+    
+    Write-Host "Servicio creado. Configurando credenciales..."
+    
+    # Configurar el servicio para que se ejecute con las credenciales proporcionadas
+    Set-Service -Name $serviceName -Credential $credential
 
-# Crear archivo de configuracion local (config.json)
-$config = @{
-    pcId = $PcName
-    serverUrl = $ServerUrl
-} | ConvertTo-Json
-$configPath = Join-Path $ScriptDir "config.json"
-$config | Out-File -FilePath $configPath -Encoding utf8
+    # Configurar la recuperación ante fallos
+    $recoveryActions = @(
+        @{ "Type" = "Restart"; "Delay" = 60000 }, # Reiniciar despues de 1 minuto
+        @{ "Type" = "Restart"; "Delay" = 300000 } # Reiniciar despues de 5 minutos
+    )
+    Set-Service -Name $serviceName -RecoveryActions $recoveryActions -RecoveryResetPeriod 86400 # Resetear contador de fallos cada dia
 
-Write-Host "Archivo de configuracion creado en '$configPath'"
+    # --- Iniciar el servicio ---
+    Write-Host "Iniciando el servicio..."
+    Start-Service -Name $serviceName
 
-# Solicitar credenciales para el servicio
-$credential = $host.ui.PromptForCredential("Credenciales para el Servicio", "Ingrese la cuenta de usuario y contrasena para ejecutar el servicio del agente. Esta cuenta debe tener permisos de administrador local y acceso a la red.", "", "")
-
-if (-not $credential) {
-    Write-Error "No se proporcionaron credenciales. La instalacion no puede continuar."
-    exit 1
-}
-
-# Crear el nuevo servicio
-try {
-    Write-Host "Creando el nuevo servicio '$ServiceName'..."
-    $serviceParams = @{
-        Name = $ServiceName
-        BinaryPathName = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$($ScriptDir)\\agent.ps1`""
-        DisplayName = $ServiceDisplayName
-        Description = $ServiceDescription
-        StartupType = "Automatic"
-        Credential = $credential
+    # Verificar que el servicio se esté ejecutando
+    $serviceStatus = (Get-Service -Name $serviceName).Status
+    if ($serviceStatus -ne 'Running') {
+        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $serviceStatus"
     }
-    New-Service @serviceParams
-
-    # Configurar la recuperacion del servicio
-    Write-Host "Configurando recuperacion del servicio..."
-    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/120000
-
-    # Iniciar el servicio
-    Write-Host "Iniciando el servicio '$ServiceName'..."
-    Start-Service -Name $ServiceName
 
     Write-Host ""
-    Write-Host "--------------------------------------------------------" -ForegroundColor Green
-    Write-Host "¡Instalacion completada!" -ForegroundColor Green
-    Write-Host "El servicio '$ServiceDisplayName' se ha instalado y esta en ejecucion."
-    Write-Host "Se ejecutara automaticamente cuando el equipo se inicie."
-    Write-Host "--------------------------------------------------------" -ForegroundColor Green
+    Write-Host ">>> ¡ÉXITO! El servicio del Agente Softland Updater se instaló e inició correctamente." -ForegroundColor $SuccessColor
+    
 }
 catch {
-    Write-Error "Ocurrio un error critico durante la instalacion: $($_.Exception.Message)"
+    # --- Bloque de Manejo de Errores ---
+    Write-Host ""
+    Write-Host ">>> ¡ERROR!" -ForegroundColor $ErrorColor
+    Write-Host "Ocurrió un error durante la instalación:" -ForegroundColor $ErrorColor
+    # Muestra el mensaje de error de PowerShell
+    Write-Host $_.Exception.Message -ForegroundColor $ErrorColor
+    
+    # Terminar el script con un código de error diferente de 0
+    # Esto le indica al .bat que algo salió mal.
     exit 1
 }

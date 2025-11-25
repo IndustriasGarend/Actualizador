@@ -4,13 +4,23 @@ import { Suspense } from 'react';
 import { db } from '@/lib/db';
 import type { PC } from '@/lib/types';
 
-// Ahora, los datos se obtienen de la base de datos SQLite.
-function getPcs() {
-  const stmt = db.prepare('SELECT * FROM pcs ORDER BY name');
-  return stmt.all() as PC[];
+// Se mueve la función fuera del componente para que sea reutilizable y clara.
+function getPcs(): PC[] {
+  try {
+    const stmt = db.prepare('SELECT * FROM pcs ORDER BY name');
+    // Aseguramos que devolvemos un array aunque no haya resultados.
+    const result = stmt.all() as PC[] | undefined;
+    return result || [];
+  } catch (error) {
+    console.error("Failed to fetch PCs:", error);
+    // En caso de error en la base de datos, devolvemos un array vacío
+    // para evitar que la página se rompa por completo.
+    return [];
+  }
 }
 
-export default function DashboardPage() {
+// Se convierte el componente de página en una función asíncrona.
+export default async function DashboardPage() {
   const pcs = getPcs();
 
   return (
