@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     try {
         // Leer los templates de los scripts
         const agentTemplatePath = path.join(process.cwd(), 'scripts', 'agent.ps1.template');
-        const installScriptPath = path.join(process.cwd(), 'scripts', 'install-service.ps1');
+        const installScriptPath = path.join(process.cwd(), 'scripts', 'install-service.ps1.template');
 
         const agentScriptContent = await fs.readFile(agentTemplatePath, 'utf-8');
         const installScriptContent = await fs.readFile(installScriptPath, 'utf-8');
@@ -63,9 +63,17 @@ export async function GET(request: Request) {
         zip.file('config.json', configContent);
         
         // 3. Incluir nssm.exe en el zip
-        const exePath = path.join(process.cwd(), 'scripts', 'nssm.exe');
-        const exeBuffer = await fs.readFile(exePath);
-        zip.file('nssm.exe', exeBuffer, { binary: true });
+        try {
+            const exePath = path.join(process.cwd(), 'scripts', 'nssm.exe');
+            const exeBuffer = await fs.readFile(exePath);
+            zip.file('nssm.exe', exeBuffer, { binary: true });
+        } catch (e: any) {
+            if (e.code === 'ENOENT') {
+                console.error("CRÍTICO: El archivo 'nssm.exe' no se encontró en la carpeta /scripts. No se puede generar el agente.");
+                throw new Error("No se encontró el archivo 'nssm.exe' en el servidor.");
+            }
+            throw e; // Relanza otros errores
+        }
         
         // 4. Añadir LEEME.txt con instrucciones actualizadas
         const readmeContent = `
@@ -81,7 +89,7 @@ Instrucciones de Instalacion:
 
 2. Haga clic derecho en 'install-service.ps1' y seleccione 'Ejecutar con PowerShell'.
    Si esta opcion no aparece, abra una terminal de PowerShell como Administrador, 
-   navegue a esta carpeta y ejecute: .\\install-service.ps1
+   navegue a esta carpeta y ejecute el script.
 
 3. Acepte la solicitud de permisos de Administrador (UAC) si aparece.
 
