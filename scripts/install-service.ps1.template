@@ -1,71 +1,71 @@
-# Softland Updater Agent Installer
+# Template for install-service.ps1
 
-# --- Configuracion ---
-$PCNameString = "__PC_NAME__"
-$ServiceName = "SoftlandUpdateAgent_" + $PCNameString.Replace("-", "").Replace(" ", "")
-$ServiceDisplayName = "Softland Updater Agent ($PCNameString)"
-$ServiceDescription = "Agente para el sistema de actualizacion remota de Softland. Mantiene el software actualizado y reporta el estado al servidor central."
-
-# --- Inicio del Script ---
-Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
-
-# Desinstalar versiones antiguas si existen
-$existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if ($existingService) {
-    Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
-    Stop-Service -Name $ServiceName -Force
-    # Usamos sc.exe delete para mas fiabilidad
-    sc.exe delete $ServiceName
-    Write-Host "Servicio anterior '$ServiceName' desinstalado."
-    # Esperar un poco para que el SCM se actualice
-    Start-Sleep -Seconds 5
-}
-
-# --- Peticion de Credenciales ---
-# Es crucial que este script se ejecute con permisos elevados.
-# El .bat que lo llama se encarga de esto.
 try {
-    # Definir el titulo y mensaje para la ventana de credenciales
-    $title = "Credenciales para el Servicio"
-    $message = "Ingrese el usuario y contrasena para ejecutar el servicio del agente (ej. DOMINIO\usuario.servicio)"
+    # --- Configuration ---
+    $PC_NAME_PLACEHOLDER = "__PC_NAME__"
+    # PowerShell-safe way to create service name
+    $ProcessedPcName = $PC_NAME_PLACEHOLDER -replace '[^a-zA-Z0-9]', ''
+    $ServiceName = "SoftlandUpdateAgent_$($ProcessedPcName)"
+    $ServiceDisplayName = "Softland Updater Agent ($PC_NAME_PLACEHOLDER)"
 
-    # Pedir las credenciales de forma segura
-    $credential = $host.ui.PromptForCredential($title, $message, "", "")
+    Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
 
-    if ($null -eq $credential) {
-        Write-Host "Instalacion cancelada. No se ingresaron credenciales."
-        exit 1
+    # --- Uninstall previous version if exists ---
+    $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($existingService) {
+        Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
+        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+        
+        $servicePath = (Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'").PathName.Split('"')[1]
+        $installDir = Split-Path -Path $servicePath -Parent
+
+        # Unregister the service
+        $uninstallResult = (Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'").Delete()
+        if ($uninstallResult.ReturnValue -eq 0) {
+            Write-Host "Servicio anterior '$ServiceName' desinstalado."
+        } else {
+            Write-Host "No se pudo desinstalar el servicio anterior (puede que ya no existiera). Codigo: $($uninstallResult.ReturnValue)"
+        }
+        
+        # Give time for the system to release file handles
+        Start-Sleep -Seconds 3
     }
-} catch {
-    Write-Host "Error al solicitar credenciales: $($_.Exception.Message)"
-    exit 1
-}
 
 
-# --- Creacion del Servicio ---
-try {
-    Write-Host "Creando el nuevo servicio '$ServiceName'..."
-    $scriptPath = (Get-Item -Path (Join-Path $PSScriptRoot 'agent.ps1')).FullName
+    # --- Get Credentials for the service user ---
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $currentDir = Split-Path -Path $scriptPath -Parent
+
+    $caption = "Credenciales para el Servicio"
+    $message = "Ingrese la cuenta de usuario y contrasena para ejecutar el servicio del agente. Use el formato: DOMINIO\usuario"
     
-    # Parametros para New-Service en un hashtable para mayor claridad
+    # Correct way to call PromptForCredential
+    $credential = $host.ui.PromptForCredential($caption, $message, "", "")
+
+    if (-not $credential) {
+        throw "La operacion fue cancelada por el usuario."
+    }
+
+    # --- Create and configure the new service ---
+    Write-Host "Creando el nuevo servicio '$ServiceName'..."
+
     $serviceParams = @{
         Name = $ServiceName
-        BinaryPathName = "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`""
+        BinaryPathName = "$currentDir\agent.exe"
         DisplayName = $ServiceDisplayName
-        Description = $ServiceDescription
-        StartupType = 'Automatic'
+        Description = "Agente de actualizacion para Softland. Se comunica con el servidor central para ejecutar tareas de actualizacion."
+        StartupType = "Automatic"
         Credential = $credential
     }
+    
     New-Service @serviceParams
 
-    # --- Configuracion de Recuperacion ---
     Write-Host "Configurando recuperacion del servicio..."
     sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
 
-    # --- Iniciar el Servicio ---
     Write-Host "Iniciando el servicio '$ServiceName'..."
     Start-Service -Name $ServiceName
-
+    
     Write-Host ""
     Write-Host "--------------------------------------------------------"
     Write-Host "Instalacion completada!"
@@ -77,5 +77,8 @@ try {
     Write-Host ""
     Write-Host "Ocurrio un error durante la instalacion:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
-    exit 1
+    Write-Host ""
 }
+
+Write-Host "Presione Enter para cerrar esta ventana:"
+Read-Host

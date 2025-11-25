@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
         if (!forUpdate) {
             zipFilename = `softland-agent-${pcName}.zip`;
-            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la cuenta y contrasena para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName.replace(/-/g, "").replace(/ /g,"")}' sera creado e iniciado.`);
+            zip.file('README.txt', `Paquete de agente para ${pcName} (ID: ${pcId})\n\nInstrucciones:\n1. Copie esta carpeta a la PC cliente (ej: C:\\SoftlandAgent).\n2. Haga doble clic en el archivo 'install.bat'.\n3. Acepte la solicitud de permisos de Administrador.\n4. Ingrese la cuenta y contrasena para el usuario de servicio cuando se solicite.\n\nEl servicio 'SoftlandUpdateAgent_${pcName.replace(/[^a-zA-Z0-9]/g, "")}' sera creado e iniciado.`);
             
             // Insertar la PC en la base de datos si no existe
             const stmt = db.prepare('INSERT OR IGNORE INTO pcs (id, name, alias, location, ip, status) VALUES (?, ?, ?, ?, ?, ?)');
