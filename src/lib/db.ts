@@ -38,7 +38,7 @@ function runMigrations() {
           );
         `);
 
-        // Tabla para almacenar los paquetes de software (AHORA CON TIPOS)
+        // Tabla para almacenar los paquetes de software
         db.exec(`
             CREATE TABLE IF NOT EXISTS packages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,7 +84,15 @@ function runMigrations() {
           );
         `);
 
-        // --- Migración para añadir postInstallScript si no existe ---
+        // Tabla para configuración general del sistema
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+          );
+        `);
+
+        // --- Migraciones de Estructura ---
         const tableInfo = db.prepare("PRAGMA table_info(packages)").all();
         const columnExists = tableInfo.some(col => (col as any).name === 'postInstallScript');
 

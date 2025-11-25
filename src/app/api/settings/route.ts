@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { SystemConfig } from '@/lib/types';
 import { z } from 'zod';
 
 const formSchema = z.object({
-  updateFilePath: z.string().min(1),
-  localUpdateDir: z.string().min(1),
-  softlandInstallDir: z.string().min(1),
-  serviceName: z.string().min(1),
-  environmentPath: z.string().optional(),
+  serverUrl: z.string().url().optional().or(z.literal('')),
 });
 
 
@@ -25,12 +20,16 @@ export async function POST(request: Request) {
 
     const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     
-    const saveConfig = db.transaction((cfg) => {
-        for (const [key, value] of Object.entries(cfg)) {
-            // Solo guardar si el valor no es undefined
-            if (value !== undefined) {
-                stmt.run(key, String(value));
-            }
+    const saveConfig = db.transaction((cfg: typeof configToSave) => {
+        // Guardar o actualizar la URL del servidor
+        if (cfg.serverUrl !== undefined) {
+          const existing = db.prepare("SELECT value FROM settings WHERE key = 'serverUrl'").get();
+          if (cfg.serverUrl) {
+            stmt.run('serverUrl', cfg.serverUrl);
+          } else {
+            // Si la URL está vacía, la eliminamos para volver a la detección automática
+            db.prepare("DELETE FROM settings WHERE key = 'serverUrl'").run();
+          }
         }
     });
 

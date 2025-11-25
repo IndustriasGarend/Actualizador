@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import JSZip from 'jszip';
+import { db } from '@/lib/db';
 
 // Helper para crear un buffer con BOM (Byte Order Mark) para UTF-8
 function getUtf8BomBuffer(content: string): Buffer {
@@ -10,6 +11,18 @@ function getUtf8BomBuffer(content: string): Buffer {
     const bufferContent = Buffer.from(content, 'utf-8');
     return Buffer.concat([bom, bufferContent]);
 }
+
+function getCustomServerUrl(): string | null {
+    try {
+        const stmt = db.prepare("SELECT value FROM settings WHERE key = 'serverUrl'");
+        const result = stmt.get() as { value: string } | undefined;
+        return result ? result.value : null;
+    } catch (e) {
+        console.error("Could not fetch custom server URL from DB", e);
+        return null;
+    }
+}
+
 
 export async function GET(request: Request) {
     try {
@@ -21,12 +34,20 @@ export async function GET(request: Request) {
         const installScriptContent = await fs.readFile(installScriptPath, 'utf-8');
         
         // --- Generación dinámica del config.json ---
-        const protocol = request.headers.get('x-forwarded-proto') || 'http';
-        const host = request.headers.get('host');
-        if (!host) {
-            throw new Error('No se pudo determinar el host del servidor.');
+        const customUrl = getCustomServerUrl();
+        let serverUrl: string;
+
+        if (customUrl) {
+            serverUrl = customUrl;
+        } else {
+            const protocol = request.headers.get('x-forwarded-proto') || 'http';
+            const host = request.headers.get('host');
+            if (!host) {
+                throw new Error('No se pudo determinar el host del servidor.');
+            }
+            serverUrl = `${protocol}://${host}`;
         }
-        const serverUrl = `${protocol}://${host}`;
+        
         const configContent = JSON.stringify({ serverUrl }, null, 2);
         // ---
 

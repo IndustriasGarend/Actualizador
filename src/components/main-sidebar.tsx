@@ -27,6 +27,7 @@ export function MainSidebar() {
     { href: '/', label: 'Panel', icon: Computer },
     { href: '/paquetes', label: 'Paquetes', icon: Package },
     { href: '/historial', label: 'Historial', icon: History },
+    { href: '/configuracion', label: 'Configuración', icon: Settings },
   ];
 
   return (

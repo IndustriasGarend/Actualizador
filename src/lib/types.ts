@@ -54,3 +54,7 @@ export interface Package {
   command: string | null;
   postInstallScript: string | null;
 }
+
+export interface SystemConfig {
+  serverUrl: string;
+}
