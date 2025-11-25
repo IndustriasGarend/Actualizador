@@ -133,35 +133,6 @@ export default function HelpPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeItem, setActiveItem] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    if (!searchTerm) {
-        setActiveItem(undefined);
-        return;
-    }
-    
-    const firstMatch = helpSections.find(section => {
-        const searchTerms = normalizeText(searchTerm).split(" ").filter(Boolean);
-        if (searchTerms.length === 0) return false;
-        const contentString = (title: string, content: React.ReactNode) => {
-             const getText = (node: React.ReactNode): string => {
-                if (typeof node === "string") return node;
-                if (Array.isArray(node)) return node.map(getText).join(" ");
-                if (typeof node === "object" && node !== null && "props" in node && node.props.children) {
-                    return getText(node.props.children);
-                }
-                return "";
-            };
-            return title + " " + getText(content);
-        }
-        const targetText = normalizeText(contentString(section.title, section.content));
-        return searchTerms.every((term) => targetText.includes(term));
-    });
-
-    setActiveItem(firstMatch?.title);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
-
-
   const helpSections = [
     {
         title: "Introducción a Clic Actualizador Tools",
@@ -188,7 +159,7 @@ export default function HelpPage() {
         title: "Guía del Panel de Control (Dashboard)",
         icon: <Computer className="mr-4 h-6 w-6 text-green-500" />,
         content: (
-             <div className="space-y-4">
+            <div className="space-y-4">
                 <p>
                 El panel de control es tu vista principal. Aquí verás una tarjeta por cada PC registrada en el sistema.
                 </p>
@@ -205,8 +176,8 @@ export default function HelpPage() {
                             <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden, pero el agente aún no la ha comenzado.</li>
                             <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente está ejecutando una tarea en este momento.</li>
                             <li><Badge variant="destructive">Error</Badge>: Ocurrió un problema durante la última tarea. Revisa el historial.</li>
-                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea fue cancelada manualmente.</li>
-                            <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC está inactiva y no recibirá nuevas tareas.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</badge>: La tarea fue cancelada manualmente.</li>
+                            <li><Badge className="bg-slate-500 text-white">Deshabilitado</badge>: La PC está inactiva y no recibirá nuevas tareas.</li>
                          </ul>
                     </li>
                      <li>
@@ -238,13 +209,16 @@ export default function HelpPage() {
                 <p>Al crear un nuevo paquete, debes elegir su tipo:</p>
                 <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Actualización de Archivos:</strong> Es el método original. Ideal para actualizaciones que solo requieren descomprimir un archivo (.zip, .7z) y copiar su contenido a una carpeta de destino. Perfecto para sistemas como Softland.
+                        <strong>Actualización de Archivos:</strong> Ideal para actualizaciones que solo requieren descomprimir un archivo (.zip, .7z) y copiar su contenido a una carpeta de destino. Perfecto para sistemas como Softland.
                     </li>
                      <li>
                         <strong>Ejecutar Script:</strong> Permite ejecutar un archivo de script (<code>.bat</code> o <code>.ps1</code>) en la PC cliente. El script debe estar en una carpeta de red compartida. Es ideal para instalaciones desatendidas (ejecutables .exe con parámetros silenciosos, .msi) o tareas de configuración complejas.
                     </li>
                      <li>
                         <strong>Comando PowerShell:</strong> Ejecuta una línea de comando directamente en una terminal de PowerShell en la PC cliente. Es la forma más rápida y directa de realizar tareas simples, como usar <strong>Winget</strong> (ej. <code>winget upgrade --all --accept-package-agreements</code>) o forzar políticas de grupo (<code>gpupdate /force</code>).
+                    </li>
+                     <li>
+                        <strong>Registro de Componentes:</strong> Diseñado específicamente para registrar componentes COM y .NET a partir de un archivo de configuración XML, como el `ERPReg.xml` de Softland.
                     </li>
                 </ul>
                 <Alert variant="default">
@@ -271,8 +245,8 @@ export default function HelpPage() {
                     <li>
                         <strong>Descargar el Paquete de Instalación:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>En la página de <strong>Ayuda</strong> (esta misma página), haz clic en el botón <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
-                             <li>El paquete `.zip` ya incluye la URL de su servidor pre-configurada.</li>
+                            <li>En la sección <strong>"Descargar Instalador del Agente"</strong> de esta misma página, haz clic en el botón <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
+                             <li>El paquete `.zip` ya incluye la URL de su servidor pre-configurada. ¡No necesita ingresar nada!</li>
                         </ul>
                     </li>
                     <li>
@@ -286,7 +260,7 @@ export default function HelpPage() {
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>Navega hasta la carpeta donde descomprimiste los archivos.</li>
                             <li>Haz **clic derecho** en el archivo `install-service.ps1` y selecciona **"Ejecutar con PowerShell"**.</li>
-                             <li>Si esta opción no aparece, abre una terminal de PowerShell como Administrador, navega a esta carpeta y ejecuta: `.\\install-service.ps1`</li>
+                             <li>Si esta opción no aparece, abre una terminal de PowerShell como Administrador, navega a la carpeta y ejecuta: `.\\install-service.ps1`</li>
                         </ul>
                     </li>
                     <li>
@@ -303,7 +277,7 @@ export default function HelpPage() {
                     <AlertTitle>PASO MANUAL Y OBLIGATORIO: Configurar Credenciales de Red</AlertTitle>
                     <AlertDescription>
                        <div className="space-y-2">
-                        <p>Para que el agente pueda acceder a los archivos en carpetas compartidas de la red, debes cambiar la cuenta con la que se ejecuta el servicio.</p>
+                        <p>Para que el agente pueda acceder a los archivos de actualización y scripts en carpetas compartidas de la red, debes cambiar la cuenta con la que se ejecuta el servicio.</p>
                         <ol className="list-decimal pl-5 space-y-1">
                             <li>Abre la consola de Servicios de Windows (`services.msc`).</li>
                             <li>Busca el servicio <strong>"Clic Actualizador Tools Agent"</strong> y abre sus propiedades.</li>
@@ -311,7 +285,7 @@ export default function HelpPage() {
                             <li>Selecciona "Esta cuenta" e ingresa las credenciales de un usuario de dominio que tenga permisos de lectura sobre las carpetas de red que usarás.</li>
                             <li>Guarda los cambios y reinicia el servicio.</li>
                         </ol>
-                        <p>La nueva PC aparecerá automáticamente en el panel de control después de unos minutos.</p>
+                        <p>Una vez reiniciado, la nueva PC aparecerá automáticamente en el panel de control después de unos minutos.</p>
                        </div>
                     </AlertDescription>
                 </Alert>
@@ -324,7 +298,7 @@ export default function HelpPage() {
         content: (
             <div className="space-y-4">
                 <p>
-                Desde aquí puedes descargar el paquete de instalación genérico para el agente. Este mismo paquete `.zip` se utiliza para todas las PCs que desees registrar en el sistema. La URL de su servidor se incluirá automáticamente en el paquete.
+                Desde aquí puedes descargar el paquete de instalación genérico para el agente. Este mismo paquete `.zip` se utiliza para todas las PCs que desees registrar en el sistema. La URL de su servidor se incluirá automáticamente en la configuración.
                 </p>
                 <div className="flex justify-center pt-4">
                     <Button onClick={() => window.location.href = '/api/download-agent'}>
@@ -336,6 +310,34 @@ export default function HelpPage() {
         )
     },
   ];
+
+  useEffect(() => {
+    if (!searchTerm) {
+        setActiveItem(undefined);
+        return;
+    }
+    
+    const firstMatch = helpSections.find(section => {
+        const searchTerms = normalizeText(searchTerm).split(" ").filter(Boolean);
+        if (searchTerms.length === 0) return false;
+        const contentString = (title: string, content: React.ReactNode) => {
+             const getText = (node: React.ReactNode): string => {
+                if (typeof node === "string") return node;
+                if (Array.isArray(node)) return node.map(getText).join(" ");
+                if (typeof node === "object" && node !== null && "props" in node && node.props.children) {
+                    return getText(node.props.children);
+                }
+                return "";
+            };
+            return title + " " + getText(content);
+        }
+        const targetText = normalizeText(contentString(section.title, section.content));
+        return searchTerms.every((term) => targetText.includes(term));
+    });
+
+    setActiveItem(firstMatch?.title);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   return (
     <main className="flex flex-col h-full">
