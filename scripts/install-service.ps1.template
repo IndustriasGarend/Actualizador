@@ -1,83 +1,105 @@
-# Script de instalación para el Agente de Clic Actualizador Tools
-# Este script debe ser ejecutado como Administrador.
+# Clic Actualizador Tools - Script de Instalación del Servicio
+# Versión: {{AGENT_VERSION}}
 
+# --- Configuración ---
 $serviceName = "ClicActualizadorToolsAgent"
 $serviceDisplayName = "Clic Actualizador Tools Agent"
-$serviceDescription = "Agente para el sistema de despliegue y actualizaciones Clic Actualizador Tools."
-$scriptDir = $PSScriptRoot
-$agentScriptPath = Join-Path $scriptDir "agent.ps1"
+$serviceDescription = "Agente que recibe y ejecuta tareas de actualización desde el panel de Clic Actualizador Tools."
+$scriptPath = Join-Path $PSScriptRoot "agent.ps1"
 
-Write-Host "Ejecutando el script de configuracion de PowerShell..."
-Write-Host ""
-
-try {
-    # --- 1. LIMPIEZA DE VERSIONES ANTERIORES ---
-    Write-Host "Buscando versiones anteriores del servicio..."
-    $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($existingService) {
-        Write-Host "Se encontró un servicio existente. Deteniendo y eliminándolo..."
-        Stop-Service -Name $serviceName -Force
-        sc.exe delete $serviceName
-        Start-Sleep -Seconds 2 # Dar tiempo a que el servicio se elimine completamente
-        Write-Host "[SC] DeleteService CORRECTO"
-    } else {
-        Write-Host "No se encontraron servicios anteriores."
-    }
-
-    # --- 2. CONFIGURACIÓN ---
-    $configPath = Join-Path $scriptDir "config.json"
-    if (-not (Test-Path $configPath)) {
-        $serverUrl = Read-Host "--> Por favor, ingresa la URL del servidor (ej. http://192.168.1.100:9002)"
-        @{ serverUrl = $serverUrl } | ConvertTo-Json | Out-File -FilePath $configPath -Encoding utf8
-        Write-Host "Archivo de configuracion 'config.json' creado."
-    } else {
-        Write-Host "El archivo 'config.json' ya existe. Usando configuración existente."
-    }
-
-    # --- 3. CREACIÓN DEL SERVICIO ---
-    Write-Host ""
-    Write-Host "Creando el nuevo servicio '$serviceDisplayName'..."
-    
-    # Solución definitiva: Establecer el directorio de trabajo del servicio
-    $binPath = "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$agentScriptPath`""
-    New-Service -Name $serviceName -BinaryPathName $binPath -DisplayName $serviceDisplayName -Description $serviceDescription -StartupType Automatic
-    
-    # Establecer que el servicio se ejecute en su propio directorio
-    sc.exe config $serviceName binPath= "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$agentScriptPath`"" start= auto
-    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -Name "AppDirectory" -Value $scriptDir
-    
-    Write-Host "Servicio creado. Iniciando el servicio..."
-    Start-Sleep -Seconds 1
-    Start-Service -Name $serviceName
-
-    # --- 4. VERIFICACIÓN ---
-    Start-Sleep -Seconds 3
-    $serviceStatus = (Get-Service -Name $serviceName).Status
-    if ($serviceStatus -eq "Running") {
-        Write-Host ""
-        Write-Host "ESTADO DEL SERVICIO: $serviceStatus" -ForegroundColor Green
-        Write-Host ""
-        Write-Host ">>> ¡ÉXITO! El servicio del Agente se instaló e inició correctamente." -ForegroundColor Green
-        Write-Host "Ahora debes configurar la cuenta de red para el servicio."
-        Write-Host "1. Abre 'services.msc'."
-        Write-Host "2. Busca el servicio '$serviceDisplayName'."
-        Write-Host "3. En Propiedades > 'Iniciar sesión', cambia a 'Esta cuenta' y pon las credenciales de un usuario con acceso a la red."
-        Write-Host "4. Reinicia el servicio."
-    } else {
-        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $serviceStatus"
-    }
-
-} catch {
-    Write-Host ""
-    Write-Host ">>> ¡ERROR! Ocurrió un problema durante la instalación." -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Por favor, verifica que estás ejecutando este script como Administrador." -ForegroundColor Yellow
+# --- Funciones de Utilidad ---
+function Show-Header {
+    Clear-Host
+    Write-Host "==========================================================" -ForegroundColor Cyan
+    Write-Host "  Instalador del Agente de Clic Actualizador Tools" -ForegroundColor White
+    Write-Host "==========================================================" -ForegroundColor Cyan
+    Write-Host
 }
 
-Write-Host ""
-Write-Host "------------------------------------------------------"
-Write-Host " INSTALACION COMPLETADA."
-Write-Host " (Puedes cerrar esta ventana)"
-Write-Host "------------------------------------------------------"
-Read-Host ""
+function Pause-And-Exit {
+    param($message)
+    Write-Host
+    Write-Host "------------------------------------------------------" -ForegroundColor Gray
+    Write-Host " INSTALACION COMPLETADA." -ForegroundColor Green
+    Write-Host " (Puedes cerrar esta ventana)" -ForegroundColor Gray
+    Write-Host "------------------------------------------------------" -ForegroundColor Gray
+    Read-Host "Presiona Enter para cerrar esta ventana..."
+    exit
+}
+
+# --- Lógica Principal ---
+Show-Header
+
+# 1. Verificar permisos de Administrador
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host ">>> ¡ERROR! Por favor, ejecuta este script como Administrador." -ForegroundColor Red
+    Write-Host "Haz clic derecho en 'install-service.ps1' y selecciona 'Ejecutar con PowerShell'." -ForegroundColor Yellow
+    Pause-And-Exit
+}
+
+Write-Host "Permisos de Administrador verificados." -ForegroundColor Green
+Write-Host
+
+# 2. Verificar si el servicio ya existe
+$service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+if ($service) {
+    Write-Host "El servicio '$serviceDisplayName' ya existe. Deteniendo e intentando reinstalar..." -ForegroundColor Yellow
+    try {
+        Stop-Service -Name $serviceName -Force -ErrorAction Stop
+        $service | Remove-Service -ErrorAction Stop
+        Write-Host "Servicio anterior eliminado correctamente." -ForegroundColor Green
+    }
+    catch {
+        Write-Host ">>> ¡ERROR! No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente desde 'services.msc'." -ForegroundColor Red
+        Pause-And-Exit
+    }
+    Write-Host
+}
+
+# 3. Crear el nuevo servicio
+Write-Host "Creando el servicio..." -ForegroundColor White
+try {
+    New-Service -Name $serviceName -BinaryPathName "powershell.exe -ExecutionPolicy Bypass -File `"$scriptPath`"" -DisplayName $serviceDisplayName -Description $serviceDescription -StartupType Automatic -ErrorAction Stop
+    Write-Host "Servicio '$serviceDisplayName' creado correctamente." -ForegroundColor Green
+    Write-Host
+}
+catch {
+    Write-Host ">>> ¡ERROR! No se pudo crear el servicio: $($_.Exception.Message)" -ForegroundColor Red
+    Pause-And-Exit
+}
+
+# 4. Iniciar el servicio y verificar estado
+Write-Host "Iniciando el servicio..." -ForegroundColor White
+try {
+    Start-Service -Name $serviceName -ErrorAction Stop
+    Write-Host
+    $finalServiceState = Get-Service -Name $serviceName
+    if ($finalServiceState.Status -eq "Running") {
+         Write-Host ">>> ¡ÉXITO! El servicio se instaló y se inició correctamente." -ForegroundColor Green
+         Write-Host "   Estado actual: $($finalServiceState.Status)" -ForegroundColor Green
+    } else {
+        throw "El servicio no pudo iniciarse y se encuentra en estado: $($finalServiceState.Status)"
+    }
+}
+catch {
+    $finalServiceState = Get-Service -Name $serviceName | Select-Object -ExpandProperty Status
+    Write-Host
+    Write-Host ">>> ¡ERROR! Ocurrió un problema durante la instalación." -ForegroundColor Red
+    Write-Host "El servicio se instaló pero no pudo iniciarse. Estado actual: $finalServiceState" -ForegroundColor Yellow
+    Write-Host "Por favor, revisa el log en 'C:\Windows\Temp\ClicUpdaterAgent.log' para más detalles." -ForegroundColor Yellow
+    Write-Host
+}
+
+# 5. Recordatorio de credenciales de red (¡MUY IMPORTANTE!)
+Write-Host
+Write-Host "====================== PASO MANUAL OBLIGATORIO ======================" -ForegroundColor Yellow
+Write-Host " Para que el agente acceda a archivos de red, DEBES cambiar su cuenta:" -ForegroundColor White
+Write-Host " 1. Abre 'services.msc'." -ForegroundColor White
+Write-Host " 2. Busca '$serviceDisplayName' y abre sus Propiedades." -ForegroundColor White
+Write-Host " 3. Ve a la pestaña 'Iniciar sesión', selecciona 'Esta cuenta' e ingresa" -ForegroundColor White
+Write-Host "    un usuario de dominio con acceso a las carpetas de red." -ForegroundColor White
+Write-Host " 4. Guarda y REINICIA el servicio para aplicar los cambios." -ForegroundColor White
+Write-Host "=====================================================================" -ForegroundColor Yellow
+
+
+Pause-And-Exit
