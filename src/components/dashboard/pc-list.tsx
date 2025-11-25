@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle, Edit } from 'lucide-react';
+import { Computer, ServerCrash, GitBranch, Ban, MoreVertical, Trash2, ToggleLeft, ToggleRight, Info, MapPin, UserCircle, Edit, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -33,21 +33,30 @@ import { toast } from '@/hooks/use-toast';
 
 
 function ClientFormattedDate({ dateString }: { dateString: string | null }) {
-  const [formattedDate, setFormattedDate] = useState<string | null>(null);
-
+  // This prevents hydration mismatch.
+  // The server will render the raw string or "Nunca".
+  // The client will render the formatted date on its initial render.
+  const [isClient, setIsClient] = useState(false);
   useEffect(() => {
-    if (dateString) {
-      // Evita la conversión de zona horaria del navegador mostrando en UTC y especificando
-      const date = new Date(dateString);
-      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-      const correctedDate = new Date(date.getTime() + userTimezoneOffset);
-      setFormattedDate(correctedDate.toLocaleString('es-ES', { timeZone: 'UTC'}));
-    } else {
-      setFormattedDate('Nunca');
-    }
-  }, [dateString]);
+    setIsClient(true);
+  }, []);
 
-  return <>{formattedDate || <span className="opacity-50">Cargando...</span>}</>;
+  if (!dateString) {
+    return <>Nunca</>;
+  }
+
+  if (!isClient) {
+    // Render a placeholder or the raw date string on the server
+    return <>{dateString}</>;
+  }
+
+  // Format the date only on the client
+  const date = new Date(dateString);
+  const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+  const correctedDate = new Date(date.getTime() + userTimezoneOffset);
+  const formattedDate = correctedDate.toLocaleString('es-ES', { timeZone: 'UTC' });
+  
+  return <>{formattedDate}</>;
 }
 
 interface PcListProps {
@@ -67,6 +76,8 @@ export function PcList({ initialPcs }: PcListProps) {
   
   const handleCloseUpdateModal = () => {
     setSelectedPcForUpdate(null);
+    // Forzar la actualización del router para obtener nuevos datos
+    router.refresh();
   };
   
   const handleCloseEditModal = () => {
@@ -90,7 +101,8 @@ export function PcList({ initialPcs }: PcListProps) {
     try {
       const response = await fetch(`/api/pcs/${pcToDelete.id}`, { method: 'DELETE' });
       if (!response.ok) {
-        throw new Error('No se pudo eliminar la PC.');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'No se pudo eliminar la PC.');
       }
       setPcs(pcs.filter(p => p.id !== pcToDelete.id));
       toast({
@@ -140,7 +152,7 @@ export function PcList({ initialPcs }: PcListProps) {
         <div className="flex flex-col items-center justify-center h-full text-center p-8 border-2 border-dashed rounded-lg bg-card">
             <ServerCrash className="w-16 h-16 text-muted-foreground" />
             <h2 className="mt-4 text-xl font-semibold">No se encontraron PCs</h2>
-            <p className="mt-2 text-muted-foreground">Agregue PCs en el panel de configuración para comenzar.</p>
+            <p className="mt-2 text-muted-foreground">Aún no se ha registrado ninguna PC. Instale el agente en un equipo cliente para que aparezca aquí automáticamente.</p>
         </div>
     );
   }
@@ -188,7 +200,7 @@ export function PcList({ initialPcs }: PcListProps) {
                             {isEnabled ? (
                               <><ToggleLeft className="mr-2 h-4 w-4" /><span>Deshabilitar</span></>
                             ) : (
-                              <><ToggleRight className="mr-2 h-4 w-4 text-accent" /><span>Habilitar</span></>
+                              <><ToggleRight className="mr-2 h-4 w-4" /><span>Habilitar</span></>
                             )}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -243,7 +255,7 @@ export function PcList({ initialPcs }: PcListProps) {
                     )}
                      {pc.agentVersion && (
                         <div className="text-muted-foreground flex items-center gap-2">
-                            <Info className="w-4 h-4" />
+                            <RefreshCw className="w-4 h-4" />
                             <p>Versión Agente: <span className={cn("font-medium text-foreground/80", isAgentOutdated && "text-red-500 font-bold")}>{pc.agentVersion}</span></p>
                         </div>
                     )}
