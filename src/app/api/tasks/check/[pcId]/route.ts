@@ -23,10 +23,20 @@ export async function POST(
   { params }: { params: { pcId: string } }
 ) {
   const pcId = params.pcId;
-  const { agentVersion } = await request.json();
+  const { agentVersion, pcName } = await request.json();
 
   try {
     const config = getSystemConfig();
+
+    // 0. Auto-registro de nuevas PCs
+    const pcCheckStmt = db.prepare("SELECT id FROM pcs WHERE id = ?");
+    const existingPc = pcCheckStmt.get(pcId);
+    if (!existingPc) {
+        const insertStmt = db.prepare("INSERT INTO pcs (id, name, status) VALUES (?, ?, 'Actualizado')");
+        // Usar pcId (hostname) tanto para id como para name
+        insertStmt.run(pcId, pcName || pcId);
+    }
+
 
     // 1. Detección de agente desactualizado (MÁXIMA PRIORIDAD)
     if (agentVersion !== LATEST_AGENT_VERSION) {

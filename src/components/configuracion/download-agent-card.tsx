@@ -5,37 +5,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Download, HardDriveDownload, HelpCircle, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export function DownloadAgentCard() {
   const [isLoading, setIsLoading] = useState(false);
-  const [pcId, setPcId] = useState('');
-  const [pcName, setPcName] = useState('');
-  const [alias, setAlias] = useState('');
-  const [location, setLocation] = useState('');
 
-
-  const handleDownload = async () => {
-    if (!pcId || !pcName) {
-      toast({
-        title: 'Campos requeridos',
-        description: 'Por favor, ingrese al menos el ID y el Nombre de la PC.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
+  const handleDownload = async () => {    
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({
-        pcId,
-        pcName,
-        alias,
-        location
-      });
-      const response = await fetch(`/api/download-agent?${params.toString()}`);
+      const response = await fetch('/api/download-agent');
 
       if (!response.ok) {
         throw new Error('Error al generar el paquete del agente.');
@@ -44,8 +22,18 @@ export function DownloadAgentCard() {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
+      const disposition = response.headers.get('content-disposition');
+      let filename = 'softland-agent-installer.zip';
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+          const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+          const matches = filenameRegex.exec(disposition);
+          if (matches != null && matches[1]) { 
+            filename = matches[1].replace(/['"]/g, '');
+          }
+      }
+
       a.href = url;
-      a.download = `softland-agent-${pcName}.zip`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -53,7 +41,7 @@ export function DownloadAgentCard() {
 
       toast({
         title: 'Descarga Iniciada',
-        description: `Paquete de agente para ${pcName} generado.`,
+        description: 'Se esta descargando el paquete de instalacion generico del agente.',
       });
 
     } catch (error) {
@@ -73,68 +61,35 @@ export function DownloadAgentCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
             <HardDriveDownload className="w-6 h-6" />
-            Descargar Agente
+            Instalador del Agente
              <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <HelpCircle className="h-5 w-5 ml-1 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p className="max-w-xs">Genera el paquete de instalación (.zip) para una nueva PC individual. Este paquete contiene los scripts necesarios para instalar el servicio del agente.</p>
+                        <p className="max-w-xs">Descarga un paquete de instalacion (.zip) generico. Este mismo paquete se puede usar en todas las PCs que se quieran registrar en el sistema.</p>
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
         </CardTitle>
         <CardDescription>
-          Genere y descargue el paquete de instalación del agente para una nueva PC cliente.
+          Descargue el paquete de instalacion del agente, que es el mismo para todas las PCs.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-            <Label htmlFor="pcId">ID de la PC (Único y requerido)</Label>
-            <Input 
-                id="pcId"
-                placeholder="ej: pc-5"
-                value={pcId}
-                onChange={(e) => setPcId(e.target.value)}
-            />
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="pcName">Nombre de la PC (Requerido)</Label>
-            <Input 
-                id="pcName"
-                placeholder="ej: CAJA-03"
-                value={pcName}
-                onChange={(e) => setPcName(e.target.value)}
-            />
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="alias">Alias / Propietario (Opcional)</Label>
-            <Input 
-                id="alias"
-                placeholder="ej: Juan Pérez"
-                value={alias}
-                onChange={(e) => setAlias(e.target.value)}
-            />
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="location">Ubicación (Opcional)</Label>
-            <Input 
-                id="location"
-                placeholder="ej: Tienda Principal"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-            />
-        </div>
+      <CardContent>
+          <p className="text-sm text-muted-foreground">
+              El paquete `.zip` contiene los scripts necesarios para instalar el agente como un servicio de Windows. Durante la instalacion, el script le solicitara la URL de este servidor.
+          </p>
       </CardContent>
       <CardFooter className="flex justify-end">
-        <Button onClick={handleDownload} disabled={isLoading || !pcId || !pcName}>
+        <Button onClick={handleDownload} disabled={isLoading}>
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Download className="mr-2 h-4 w-4" />
           )}
-          Descargar Paquete (.zip)
+          Descargar Instalador del Agente (.zip)
         </Button>
       </CardFooter>
     </Card>
