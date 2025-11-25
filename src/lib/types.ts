@@ -39,7 +39,7 @@ export interface LogEntry {
   versionId?: string | null;
 }
 
-export type PackageType = 'actualizacion_archivos' | 'ejecutar_script' | 'comando_powershell';
+export type PackageType = 'actualizacion_archivos' | 'ejecutar_script' | 'comando_powershell' | 'registro_componentes';
 
 export interface Package {
   id: number;
@@ -54,4 +54,3 @@ export interface Package {
   command: string | null;
   postInstallScript: string | null;
 }
-

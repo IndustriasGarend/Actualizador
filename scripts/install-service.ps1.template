@@ -1,106 +1,83 @@
-# Clic Actualizador Tools - Instalador del Agente de Cliente
-# Este script instala el agente como un servicio de Windows.
+# Script de instalación para el Agente de Clic Actualizador Tools
+# Este script debe ser ejecutado como Administrador.
 
-# --- Configuración ---
 $serviceName = "ClicActualizadorToolsAgent"
 $serviceDisplayName = "Clic Actualizador Tools Agent"
-$serviceDescription = "Agente de Clic Actualizador Tools para la gestión remota de software."
+$serviceDescription = "Agente para el sistema de despliegue y actualizaciones Clic Actualizador Tools."
+$scriptDir = $PSScriptRoot
+$agentScriptPath = Join-Path $scriptDir "agent.ps1"
 
-# --- Inicio del Script ---
-$ErrorActionPreference = "Stop"
-
-# Asegurarse de que se ejecuta como Administrador
-if (-Not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Warning "Este script debe ser ejecutado como Administrador."
-    Write-Warning "Por favor, haz clic derecho sobre el archivo y selecciona 'Ejecutar con PowerShell'."
-    Read-Host "Presiona Enter para salir."
-    exit 1
-}
-
-$scriptRoot = $PSScriptRoot
+Write-Host "Ejecutando el script de configuracion de PowerShell..."
+Write-Host ""
 
 try {
-    Write-Host "Ejecutando el script de configuracion de PowerShell..."
-
-    # 1. Buscar y detener servicio existente
+    # --- 1. LIMPIEZA DE VERSIONES ANTERIORES ---
     Write-Host "Buscando versiones anteriores del servicio..."
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($existingService) {
-        Write-Host "Se encontró un servicio existente. Deteniéndolo y eliminándolo..."
-        try {
-            Stop-Service -Name $serviceName -Force
-            Write-Host "Servicio detenido."
-        } catch {
-            Write-Warning "El servicio no se pudo detener (puede que ya estuviera detenido)."
-        }
-        
-        # Usar sc.exe delete para mayor fiabilidad
+        Write-Host "Se encontró un servicio existente. Deteniendo y eliminándolo..."
+        Stop-Service -Name $serviceName -Force
         sc.exe delete $serviceName
-        Start-Sleep -Seconds 3 # Dar tiempo a que el servicio se elimine completamente
-        Write-Host "Servicio anterior eliminado."
+        Start-Sleep -Seconds 2 # Dar tiempo a que el servicio se elimine completamente
+        Write-Host "[SC] DeleteService CORRECTO"
     } else {
-        Write-Host "No se encontró un servicio existente. Se procederá con una instalación nueva."
-    }
-    
-    # 2. Crear archivo de configuración (config.json)
-    $configFile = Join-Path -Path $scriptRoot -ChildPath "config.json"
-    if (Test-Path $configFile) {
-       $configContent = Get-Content $configFile -Raw | ConvertFrom-Json
-       $serverUrl = $configContent.serverUrl
-       Write-Host "Archivo 'config.json' ya existe con URL: $serverUrl"
-    } else {
-       throw "El archivo config.json no fue encontrado en el paquete. La descarga puede estar corrupta."
+        Write-Host "No se encontraron servicios anteriores."
     }
 
-    # 3. Crear el nuevo servicio
+    # --- 2. CONFIGURACIÓN ---
+    $configPath = Join-Path $scriptDir "config.json"
+    if (-not (Test-Path $configPath)) {
+        $serverUrl = Read-Host "--> Por favor, ingresa la URL del servidor (ej. http://192.168.1.100:9002)"
+        @{ serverUrl = $serverUrl } | ConvertTo-Json | Out-File -FilePath $configPath -Encoding utf8
+        Write-Host "Archivo de configuracion 'config.json' creado."
+    } else {
+        Write-Host "El archivo 'config.json' ya existe. Usando configuración existente."
+    }
+
+    # --- 3. CREACIÓN DEL SERVICIO ---
+    Write-Host ""
     Write-Host "Creando el nuevo servicio '$serviceDisplayName'..."
-    $agentScriptPath = Join-Path -Path $scriptRoot -ChildPath "agent.ps1"
     
-    # Asegurarse de que el path a powershell.exe es correcto
-    $powershellPath = (Get-Command powershell.exe).Source
+    # Solución definitiva: Establecer el directorio de trabajo del servicio
+    $binPath = "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$agentScriptPath`""
+    New-Service -Name $serviceName -BinaryPathName $binPath -DisplayName $serviceDisplayName -Description $serviceDescription -StartupType Automatic
     
-    # Definir el path completo para el ejecutable del servicio
-    $binaryPath = """$powershellPath"" -NoProfile -ExecutionPolicy Bypass -File ""$agentScriptPath"""
-
-    New-Service -Name $serviceName `
-                -BinaryPathName $binaryPath `
-                -DisplayName $serviceDisplayName `
-                -Description $serviceDescription `
-                -StartupType Automatic
-
-    Write-Host "Servicio creado."
-
-    # 4. Iniciar el servicio y verificar
-    Write-Host "Iniciando el servicio..."
+    # Establecer que el servicio se ejecute en su propio directorio
+    sc.exe config $serviceName binPath= "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$agentScriptPath`"" start= auto
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -Name "AppDirectory" -Value $scriptDir
+    
+    Write-Host "Servicio creado. Iniciando el servicio..."
+    Start-Sleep -Seconds 1
     Start-Service -Name $serviceName
-    
-    # Verificación final
-    Start-Sleep -Seconds 2
+
+    # --- 4. VERIFICACIÓN ---
+    Start-Sleep -Seconds 3
     $serviceStatus = (Get-Service -Name $serviceName).Status
-    if ($serviceStatus -ne "Running") {
-        throw "El servicio se creó pero no se pudo iniciar. Estado actual: $serviceStatus"
+    if ($serviceStatus -eq "Running") {
+        Write-Host ""
+        Write-Host "ESTADO DEL SERVICIO: $serviceStatus" -ForegroundColor Green
+        Write-Host ""
+        Write-Host ">>> ¡ÉXITO! El servicio del Agente se instaló e inició correctamente." -ForegroundColor Green
+        Write-Host "Ahora debes configurar la cuenta de red para el servicio."
+        Write-Host "1. Abre 'services.msc'."
+        Write-Host "2. Busca el servicio '$serviceDisplayName'."
+        Write-Host "3. En Propiedades > 'Iniciar sesión', cambia a 'Esta cuenta' y pon las credenciales de un usuario con acceso a la red."
+        Write-Host "4. Reinicia el servicio."
+    } else {
+        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $serviceStatus"
     }
-    
-    Write-Host ""
-    Write-Host "--> ¡ÉXITO! El servicio del Agente se instaló y está en estado '$serviceStatus'." -ForegroundColor Green
-    Write-Host ""
-    Write-Host "--- PASO MANUAL Y OBLIGATORIO ---" -ForegroundColor Yellow
-    Write-Host "Ahora debes configurar la cuenta de red para el servicio."
-    Write-Host "1. Abre 'services.msc'."
-    Write-Host "2. Busca el servicio '$serviceDisplayName'."
-    Write-Host "3. En Propiedades > 'Iniciar sesión', cambia a 'Esta cuenta' y pon las credenciales de un usuario con acceso a la red."
-    Write-Host "4. Reinicia el servicio para aplicar los cambios."
-    Write-Host "----------------------------------"
-    Write-Host ""
 
 } catch {
-    Write-Error "XXX ¡ERROR! Ocurrió un problema durante la instalación. XXX"
-    Write-Error "Detalles: $($_.Exception.Message)"
-    Write-Error "Por favor, revisa los mensajes de error anteriores."
-} finally {
-    Write-Host "------------------------------------------------------"
-    Write-Host " PROCESO DE INSTALACION FINALIZADO."
-    Write-Host " (Puedes cerrar esta ventana)"
-    Write-Host "------------------------------------------------------"
-    Read-Host
+    Write-Host ""
+    Write-Host ">>> ¡ERROR! Ocurrió un problema durante la instalación." -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Por favor, verifica que estás ejecutando este script como Administrador." -ForegroundColor Yellow
 }
+
+Write-Host ""
+Write-Host "------------------------------------------------------"
+Write-Host " INSTALACION COMPLETADA."
+Write-Host " (Puedes cerrar esta ventana)"
+Write-Host "------------------------------------------------------"
+Read-Host ""
