@@ -1,271 +1,220 @@
 # Clic Actualizador Tools - Agente de Ejecución
-# Version 1.3
+# Versión: 1.3
 
-# --- Configuración Inicial y Logging ---
-$global:scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$global:logFile = Join-Path -Path $global:scriptDir -ChildPath "agent.log"
+# --- Configuración Inicial y Funciones Helper ---
 $global:taskFailed = $false
+$agentDir = $PSScriptRoot
+$sevenZipPath = Join-Path $agentDir "7za.exe"
 
-function Write-Log {
-    param([string]$Message)
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "[$timestamp] - $Message"
-    Add-Content -Path $global:logFile -Value $logMessage
-    # Opcional: Mostrar en consola si se ejecuta interactivamente
-    # Write-Host $logMessage
-}
-
-function Report-To-Server {
-    param (
-        [string]$action,
-        [string]$status,
-        [string]$message = "",
-        [string]$versionId = "",
-        [int]$taskId = 0,
-        [PSCustomObject]$hardwareInfo = $null
+# Función para enviar logs al servidor central
+function Log-ToServer {
+    param(
+        [Parameter(Mandatory=$true)] [string]$action,
+        [Parameter(Mandatory=$true)] [string]$status,
+        [Parameter(Mandatory=$false)] [string]$message,
+        [Parameter(Mandatory=$false)] [string]$versionId,
+        [Parameter(Mandatory=$false)] [int]$taskId
     )
+    
     try {
-        $payload = @{
-            pcId = $env:COMPUTERNAME
-            pcName = $env:COMPUTERNAME
-            action = $action
-            status = $status
-            message = $message
-            versionId = $versionId
+        $logPayload = @{
+            pcId = $pcId;
+            pcName = $pcName;
+            action = $action;
+            status = $status;
+            message = $message;
+            versionId = $versionId;
             taskId = $taskId
-            agentVersion = "1.3"
-            ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
-            loggedUser = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
         }
-
-        if ($null -ne $hardwareInfo) {
-            $payload.Add("hardwareInfo", $hardwareInfo)
-        }
-
-        $jsonPayload = $payload | ConvertTo-Json -Depth 5
-        Invoke-RestMethod -Uri "$($global:serverUrl)/api/tasks/log" -Method Post -Body $jsonPayload -ContentType "application/json" -ErrorAction Stop
+        
+        Invoke-RestMethod -Uri "$serverUrl/api/tasks/log" -Method Post -Body ($logPayload | ConvertTo-Json) -ContentType "application/json" -ErrorAction Stop
     } catch {
-        Write-Log "FATAL: No se pudo reportar al servidor. Error: $($_.Exception.Message)"
+        Write-Host "FATAL: No se pudo enviar el log al servidor. Error: $($_.Exception.Message)"
     }
 }
 
-function Get-HardwareInfo {
-    $os = Get-CimInstance -ClassName Win32_OperatingSystem
-    $cpu = Get-CimInstance -ClassName Win32_Processor
-    $memory = Get-CimInstance -ClassName Win32_ComputerSystem
-    $disks = Get-CimInstance -ClassName Win32_DiskDrive | Select-Object @{N="size";E={[math]::Round($_.Size / 1GB)}}, model
-
-    return [PSCustomObject]@{
-        osName = $os.Caption
-        osVersion = $os.Version
-        cpuModel = $cpu.Name
-        cpuCores = $cpu.NumberOfCores
-        totalMemory = [math]::Round($memory.TotalPhysicalMemory / 1MB)
-        disks = ($disks | ConvertTo-Json -Compress)
-    }
-}
-
-
-# --- Función Principal de Tareas ---
-function Execute-Task {
-    param ($config, $taskId)
-
-    Write-Log "Iniciando tarea ID $taskId con configuración..."
-    Report-To-Server -action "Procesando tarea" -status "Éxito" -message "Tarea ID $taskId iniciada." -taskId $taskId
-
-    $servicesToRestart = @()
-
+# --- Bucle Principal del Agente ---
+while ($true) {
     try {
-        # 1. Detener servicios (si aplica)
-        if (-not [string]::IsNullOrEmpty($config.serviceName)) {
-            $serviceNames = $config.serviceName -split ',' | ForEach-Object { $_.Trim() }
+        # Cargar configuración desde el config.json en el mismo directorio
+        $configPath = Join-Path $agentDir "config.json"
+        if (-not (Test-Path $configPath)) {
+            Write-Host "FATAL: config.json no encontrado en $agentDir. Saliendo."
+            Start-Sleep -Seconds 60
+            continue
+        }
+        $config = Get-Content $configPath | ConvertFrom-Json
+        $serverUrl = $config.serverUrl
+        $pcId = $env:COMPUTERNAME # O un identificador único si se prefiere
+        $pcName = $env:COMPUTERNAME
+        
+        # Payload de chequeo de tareas
+        $checkPayload = @{
+            agentVersion = "1.3";
+            pcName = $pcName
+        }
+
+        # Chequear si hay tareas pendientes
+        $response = Invoke-RestMethod -Uri "$serverUrl/api/tasks/check/$pcId" -Method Post -Body ($checkPayload | ConvertTo-Json) -ContentType "application/json" -ErrorAction Stop
+        
+        # Si no hay tarea, esperar y continuar el bucle
+        if ($response.task -eq "ninguna") {
+            Start-Sleep -Seconds 30
+            continue
+        }
+
+        # --- Procesamiento de Tarea ---
+        $global:taskFailed = $false
+        $taskConfig = $response.config
+        $taskId = $response.taskId
+        $servicesToRestart = @()
+
+        Log-ToServer -action "Procesando tarea $($taskConfig.name)" -status "Éxito" -message "Tarea recibida por el agente." -taskId $taskId
+
+        # Detener servicios si es necesario
+        if (-not ([string]::IsNullOrEmpty($taskConfig.serviceName))) {
+            $serviceNames = $taskConfig.serviceName.Split(',') | ForEach-Object { $_.Trim() }
             foreach ($service in $serviceNames) {
-                $serviceObj = Get-Service -Name $service -ErrorAction SilentlyContinue
-                if ($serviceObj -and $serviceObj.Status -eq 'Running') {
-                    Write-Log "Deteniendo servicio: $service..."
-                    Stop-Service -Name $service -Force
-                    $servicesToRestart += $service # Recordar para reiniciar
+                try {
+                    $serviceStatus = Get-Service -Name $service -ErrorAction Stop
+                    if ($serviceStatus.Status -eq 'Running') {
+                        Log-ToServer -action "Deteniendo servicio" -status "Éxito" -message "Deteniendo servicio: $service" -taskId $taskId
+                        Stop-Service -Name $service -Force -ErrorAction Stop
+                        $servicesToRestart += $service
+                    }
+                } catch {
+                    # No tratar como error fatal si el servicio no existe
+                    Log-ToServer -action "Deteniendo servicio" -status "Omitido" -message "El servicio $service no existe o no se pudo detener. Error: $($_.Exception.Message)" -taskId $taskId
                 }
             }
         }
         
-        $sevenZipPath = Join-Path -Path $global:scriptDir -ChildPath "7za.exe"
-        if (-not (Test-Path $sevenZipPath)) {
-            throw "CRITICO: No se encontró 7za.exe en el directorio del agente. No se pueden procesar archivos comprimidos."
-        }
-
-        # 2. Lógica principal basada en el tipo de paquete
-        switch ($config.packageType) {
-            "actualizacion_archivos" {
-                Write-Log "Tipo de tarea: Actualización de Archivos."
-                
-                # Crear directorio local si no existe
-                if (-not (Test-Path $config.localUpdateDir)) {
-                    New-Item -Path $config.localUpdateDir -ItemType Directory | Out-Null
+        # --- Lógica por Tipo de Paquete ---
+        try {
+            if ($taskConfig.packageType -eq "actualizacion_archivos") {
+                if (-not (Test-Path $sevenZipPath)) {
+                    throw "7za.exe no encontrado en $agentDir. La extracción de archivos no puede continuar."
                 }
-
-                $fileName = Split-Path -Path $config.updateFilePath -Leaf
-                $localFilePath = Join-Path -Path $config.localUpdateDir -ChildPath $fileName
+                Log-ToServer -action "Copiando archivos" -status "Éxito" -message "Iniciando descarga desde $($taskConfig.updateFilePath)" -taskId $taskId
+                Copy-Item -Path $taskConfig.updateFilePath -Destination $taskConfig.localUpdateDir -Force -ErrorAction Stop
                 
-                Write-Log "Copiando $($config.updateFilePath) a $($localFilePath)..."
-                Copy-Item -Path $config.updateFilePath -Destination $localFilePath -Force
+                $fileName = Split-Path $taskConfig.updateFilePath -Leaf
+                $localArchiveFile = Join-Path $taskConfig.localUpdateDir $fileName
 
-                Write-Log "Extrayendo $($localFilePath) a $($config.installDir)..."
-                & $sevenZipPath x $localFilePath -o"$($config.installDir)" -y | Out-Null
-            }
-            "ejecutar_script" {
-                Write-Log "Tipo de tarea: Ejecutar Script."
-                $fileName = Split-Path -Path $config.updateFilePath -Leaf
-                $localScriptPath = Join-Path -Path $global:scriptDir -ChildPath $fileName
-
-                Write-Log "Descargando script $($config.updateFilePath) a $($localScriptPath)..."
-                Copy-Item -Path $config.updateFilePath -Destination $localScriptPath -Force
-
-                Write-Log "Ejecutando script: $localScriptPath..."
+                Log-ToServer -action "Extrayendo archivos" -status "Éxito" -message "Extrayendo $fileName en $($taskConfig.installDir)" -taskId $taskId
+                & $sevenZipPath x $localArchiveFile -o"$($taskConfig.installDir)" -y | Out-Null
+            } 
+            elseif ($taskConfig.packageType -eq "ejecutar_script") {
+                Log-ToServer -action "Ejecutando script" -status "Éxito" -message "Descargando y ejecutando $($taskConfig.updateFilePath)" -taskId $taskId
+                $scriptFileName = Split-Path $taskConfig.updateFilePath -Leaf
+                $localScriptPath = Join-Path $env:TEMP $scriptFileName
+                Copy-Item -Path $taskConfig.updateFilePath -Destination $localScriptPath -Force -ErrorAction Stop
+                
+                # Ejecutar el script
                 & $localScriptPath
             }
-            "comando_powershell" {
-                Write-Log "Tipo de tarea: Comando PowerShell."
-                Write-Log "Ejecutando comando: $($config.command)"
-                Invoke-Expression -Command $config.command
+            elseif ($taskConfig.packageType -eq "comando_powershell") {
+                Log-ToServer -action "Ejecutando comando PS" -status "Éxito" -message "Ejecutando: $($taskConfig.command)" -taskId $taskId
+                Invoke-Expression -Command $taskConfig.command
             }
-            "registro_componentes" {
-                Write-Log "Tipo de tarea: Registro de Componentes."
-                [xml]$xml = Get-Content -Path $config.updateFilePath
+            elseif ($taskConfig.packageType -eq "registro_componentes") {
+                Log-ToServer -action "Registro de Componentes" -status "Éxito" -message "Iniciando registro desde $($taskConfig.updateFilePath)" -taskId $taskId
                 
-                $regAsmPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe"
-                if (Test-Path "C:\Windows\Microsoft.NET\Framework64") {
+                # Determinar la ruta correcta de RegAsm.exe (32 vs 64 bits)
+                $regAsmPath = ""
+                if ($env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
                     $regAsmPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe"
-                    Write-Log "Sistema de 64-bit detectado. Usando RegAsm de 64-bit."
+                } else {
+                    $regAsmPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe"
                 }
 
-                Set-Location -Path $config.installDir
-                Write-Log "Directorio de trabajo cambiado a $($config.installDir)"
+                [xml]$xml = Get-Content $taskConfig.updateFilePath
+                $baseDir = $taskConfig.installDir
 
                 foreach ($componente in $xml.COMPONENTES.COMPONENTE) {
-                    $nombre = $componente.Nombre
+                    $componentName = $componente.Nombre
+                    $componentType = $componente.Tipo
+                    
                     try {
-                        switch ($componente.Tipo) {
-                            "COMEXE" {
-                                Write-Log "Registrando COMEXE: $nombre.exe"
-                                & regsvr32.exe /s "$($nombre).exe"
-                            }
-                            "ASSEMBLY" {
-                                Write-Log "Registrando ASSEMBLY: $nombre"
-                                & $regAsmPath "$($nombre)" /codebase /tlb
-                            }
-                             "ASSEMBLYv4" {
-                                Write-Log "Registrando ASSEMBLYv4: $nombre"
-                                & $regAsmPath "$($nombre)" /codebase /tlb
-                            }
-                            "REGSVR32" {
-                                 Write-Log "Registrando REGSVR32: $nombre"
-                                & regsvr32.exe /s "$($nombre)"
+                        $fileToRegister = ""
+                        $action = ""
+
+                        if ($componentType -eq "COMEXE") {
+                            $fileToRegister = Join-Path $baseDir "$componentName.exe"
+                            if (Test-Path $fileToRegister) {
+                                Log-ToServer -action "Registrando COM EXE" -status "Éxito" -message "Registrando $componentName.exe" -taskId $taskId
+                                Start-Process -FilePath "regsvr32.exe" -ArgumentList "/s `"$fileToRegister`"" -Wait
+                            } else {
+                                $fileToRegister = Join-Path $baseDir "$componentName.dll"
+                                if (Test-Path $fileToRegister) {
+                                     Log-ToServer -action "Registrando COM DLL" -status "Éxito" -message "Registrando $componentName.dll" -taskId $taskId
+                                     Start-Process -FilePath "regsvr32.exe" -ArgumentList "/s `"$fileToRegister`"" -Wait
+                                } else {
+                                    throw "No se encontró $componentName.exe o $componentName.dll en $baseDir"
+                                }
                             }
                         }
-                        Report-To-Server -action "Registro componente" -status "Éxito" -message "$nombre registrado." -taskId $taskId
+                        elseif ($componentType -like "ASSEMBLY*") {
+                            $fileToRegister = Join-Path $baseDir "$componentName.dll"
+                             if (Test-Path $fileToRegister) {
+                                Log-ToServer -action "Registrando Assembly .NET" -status "Éxito" -message "Registrando $componentName.dll con RegAsm" -taskId $taskId
+                                Start-Process -FilePath $regAsmPath -ArgumentList "`"$fileToRegister`" /codebase /tlb" -Wait
+                             } else {
+                                 throw "No se encontró $componentName.dll en $baseDir"
+                             }
+                        }
                     } catch {
-                         Report-To-Server -action "Registro componente" -status "Fallo" -message "Error al registrar $nombre: $($_.Exception.Message)" -taskId $taskId
+                         Log-ToServer -action "Registro de Componente" -status "Fallo" -message "Error registrando $componentName: $($_.Exception.Message)" -taskId $taskId
                     }
                 }
             }
-        }
-
-        # 3. Ejecutar script Post-Instalación (si aplica)
-        if (-not [string]::IsNullOrEmpty($config.postInstallScript)) {
-            Write-Log "Ejecutando script post-instalación..."
-            if (-not [string]::IsNullOrEmpty($config.installDir) -and (Test-Path $config.installDir)) {
-                Set-Location -Path $config.installDir
-                Write-Log "Directorio de trabajo para post-script cambiado a $($config.installDir)"
-            }
-            Invoke-Expression -Command $config.postInstallScript
-        }
-
-    } catch {
-        $errorMessage = $_.Exception.Message
-        Write-Log "ERROR en la tarea $taskId: $errorMessage"
-        Report-To-Server -action "Fallo en la tarea" -status "Fallo" -message $errorMessage -taskId $taskId
-        $global:taskFailed = $true
-    } finally {
-        # 4. Reiniciar servicios (si aplica), solo los que estaban corriendo
-        if ($servicesToRestart.Count -gt 0) {
-            Write-Log "Reiniciando servicios..."
-            foreach ($service in $servicesToRestart) {
+        
+            # Ejecutar script Post-Instalación si existe y la tarea principal no ha fallado
+            if (-not ([string]::IsNullOrEmpty($taskConfig.postInstallScript)) -and -not $global:taskFailed) {
+                Log-ToServer -action "Script Post-Instalación" -status "Éxito" -message "Ejecutando script post-instalación." -taskId $taskId
                 try {
-                    $serviceObj = Get-Service -Name $service -ErrorAction SilentlyContinue
-                    if ($serviceObj -and $serviceObj.Status -eq 'Stopped') {
-                         Write-Log "Iniciando servicio: $service..."
-                         Start-Service -Name $service
-                    } else {
-                         Write-Log "Servicio $service ya no estaba detenido. Omitiendo reinicio."
-                    }
+                    Set-Location -Path $taskConfig.installDir -ErrorAction Stop
+                    Invoke-Expression -Command $taskConfig.postInstallScript -ErrorAction Stop
                 } catch {
-                    Write-Log "No se pudo reiniciar el servicio $service. Error: $($_.Exception.Message)"
+                    throw "El script post-instalación falló con el error: $($_.Exception.Message)"
                 }
-            }
-        }
-
-        # 5. Reporte final
-        if (-not $global:taskFailed) {
-            $versionId = if ($config.packageType -eq 'actualizacion_archivos') { $config.name } else { '' }
-            Report-To-Server -action "Actualización completada" -status "Éxito" -message "La tarea finalizó correctamente." -versionId $versionId -taskId $taskId
-            Write-Log "Tarea $taskId completada con éxito."
-        } else {
-             Write-Log "Tarea $taskId finalizada con fallos."
-        }
-    }
-}
-
-
-# --- Bucle Principal del Agente ---
-try {
-    Write-Log "Iniciando Agente de Clic Actualizador Tools..."
-    $configPath = Join-Path -Path $global:scriptDir -ChildPath "config.json"
-    if (-not (Test-Path $configPath)) {
-        throw "No se encontró el archivo config.json. El agente no puede iniciar."
-    }
-    $global:serverUrl = (Get-Content -Raw -Path $configPath | ConvertFrom-Json).serverUrl
-    Write-Log "Servidor configurado en: $($global:serverUrl)"
-
-    Report-To-Server -action "Agente iniciado" -status "Éxito" -message "El agente se ha iniciado/reportado." -hardwareInfo (Get-HardwareInfo)
-    
-    # Bucle infinito para verificar tareas
-    while ($true) {
-        try {
-            $checkPayload = @{
-                agentVersion = "1.3"
-                pcName = $env:COMPUTERNAME
-            } | ConvertTo-Json
-            
-            $response = Invoke-RestMethod -Uri "$($global:serverUrl)/api/tasks/check/$($env:COMPUTERNAME)" -Method Post -Body $checkPayload -ContentType "application/json" -ErrorAction Stop
-            
-            if ($response.task -eq "actualizar") {
-                Write-Log "Nueva tarea recibida: $($response.config.name)"
-                Execute-Task -config $response.config -taskId $response.taskId
-                $global:taskFailed = $false # Resetear bandera para la proxima tarea
-            } elseif ($response.task -eq "cancelar") {
-                Report-To-Server -action "Tarea cancelada por servidor" -status "Cancelado" -message "La tarea ID $($response.taskId) fue cancelada remotamente." -taskId $response.taskId
-            } elseif ($response.task -eq "actualizar_agente") {
-                Report-To-Server -action "Auto-actualización iniciada" -status "Éxito" -message "Descargando nuevo instalador del agente."
-                $installerPath = Join-Path -Path $global:scriptDir -ChildPath "agent-installer.zip"
-                Invoke-WebRequest -Uri "$($global:serverUrl)/api/download-agent" -OutFile $installerPath
-                # El nuevo instalador debe ser ejecutado manualmente o por otro proceso.
-                Report-To-Server -action "Auto-actualización lista" -status "Éxito" -message "Nuevo instalador descargado en $($installerPath). Se requiere ejecución manual."
             }
 
         } catch {
+            # Captura de errores del bloque de lógica de paquete
             $errorMessage = $_.Exception.Message
-            if ($_.Exception.Response) {
-                $errorMessage = $_.Exception.Response.GetResponseStream() | ForEach-Object { (New-Object System.IO.StreamReader($_)).ReadToEnd() }
+            Log-ToServer -action "Tarea Fallida" -status "Fallo" -message $errorMessage -taskId $taskId
+            $global:taskFailed = $true
+        } finally {
+             # Reiniciar servicios si es necesario
+            foreach ($service in $servicesToRestart) {
+                try {
+                    $serviceStatus = Get-Service -Name $service -ErrorAction Stop
+                    if ($serviceStatus.Status -eq 'Stopped') {
+                        Log-ToServer -action "Reiniciando servicio" -status "Éxito" -message "Reiniciando servicio: $service" -taskId $taskId
+                        Start-Service -Name $service -ErrorAction Stop
+                    } else {
+                         Log-ToServer -action "Reiniciando servicio" -status "Omitido" -message "El servicio $service ya se encuentra en estado $($serviceStatus.Status)." -taskId $taskId
+                    }
+                } catch {
+                    Log-ToServer -action "Reiniciando servicio" -status "Fallo" -message "No se pudo reiniciar el servicio $service. Error: $($_.Exception.Message)" -taskId $taskId
+                }
             }
-             Write-Log "Error en el bucle principal: $errorMessage"
+
+            # Log final de la tarea
+            if (-not $global:taskFailed) {
+                 Log-ToServer -action "Actualización completada" -status "Éxito" -message "La tarea se completó sin errores." -versionId ($taskConfig.name) -taskId $taskId
+            } else {
+                 Log-ToServer -action "Actualización completada" -status "Fallo" -message "La tarea finalizó con uno o más errores." -taskId $taskId
+            }
         }
         
-        # Esperar 30 segundos antes de la siguiente verificación
-        Start-Sleep -Seconds 30
-    }
+        # Pausa breve antes de buscar la siguiente tarea
+        Start-Sleep -Seconds 5
 
-} catch {
-    Write-Log "ERROR CRITICO DEL AGENTE: $($_.Exception.Message)"
-    Report-To-Server -action "Fallo crítico del agente" -status "Fallo" -message $_.Exception.Message
+    } catch {
+        # Captura de errores del bucle principal (ej. fallo de red al chequear tareas)
+        Write-Host "ERROR: No se pudo conectar al servidor o procesar la respuesta. Reintentando en 60 segundos. Error: $($_.Exception.Message)"
+        Start-Sleep -Seconds 60
+    }
 }
