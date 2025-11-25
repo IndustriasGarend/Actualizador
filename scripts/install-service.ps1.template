@@ -1,84 +1,86 @@
-# Template for install-service.ps1
+# Template para el script de instalacion del servicio
+$ErrorActionPreference = "SilentlyContinue"
+
+# Define el nombre del servicio basado en el nombre de la PC, quitando caracteres no alfanumericos.
+$PcName = "__PC_NAME__"
+$CleanedPcName = $PcName -replace '[^a-zA-Z0-9]', ''
+$ServiceName = "SoftlandUpdateAgent_$($CleanedPcName)"
+$ServiceDisplayName = "Softland Updater Agent ($($PcName))"
+
+# Funcion para desinstalar una version anterior
+function Uninstall-OldService {
+    param([string]$name)
+    $service = Get-Service -Name $name -ErrorAction SilentlyContinue
+    if ($service) {
+        Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
+        Stop-Service -Name $name -Force
+        $service | Remove-Service -Force
+        Write-Host "Servicio anterior '$($name)' desinstalado."
+        Start-Sleep -Seconds 2 # Dar tiempo a que el sistema procese la eliminacion
+    }
+}
+
+# --- Inicio del Script ---
+Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
+
+# Desinstalar cualquier version anterior
+Uninstall-OldService -name $ServiceName
+
+
+# Obtener credenciales de forma segura
+try {
+    $Title = "Credenciales para el Servicio"
+    $Message = "Ingrese la cuenta y contrasena para el servicio (formato: DOMINIO\usuario)"
+    $credential = $host.ui.PromptForCredential($Title, $Message, "", "")
+} catch {
+    Write-Host "No se pudieron obtener las credenciales. Error: $($_.Exception.Message)"
+    Read-Host "Presione Enter para salir."
+    exit 1
+}
+
+
+# Crear el nuevo servicio
+Write-Host "Creando el nuevo servicio '$($ServiceName)'..."
+
+$serviceParams = @{
+    Name = $ServiceName
+    BinaryPathName = """$($PSScriptRoot)\agent.exe"""
+    DisplayName = $ServiceDisplayName
+    StartupType = "Automatic"
+    Description = "Agente para el sistema de actualizaciones de Softland."
+    Credential = $credential
+}
 
 try {
-    # --- Configuration ---
-    $PC_NAME_PLACEHOLDER = "__PC_NAME__"
-    # PowerShell-safe way to create service name
-    $ProcessedPcName = $PC_NAME_PLACEHOLDER -replace '[^a-zA-Z0-9]', ''
-    $ServiceName = "SoftlandUpdateAgent_$($ProcessedPcName)"
-    $ServiceDisplayName = "Softland Updater Agent ($PC_NAME_PLACEHOLDER)"
-
-    Write-Host "--- Iniciando instalador del Agente de Softland Updater ---"
-
-    # --- Uninstall previous version if exists ---
-    $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    if ($existingService) {
-        Write-Host "Se encontro una version anterior del servicio. Desinstalando..."
-        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-        
-        $servicePath = (Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'").PathName.Split('"')[1]
-        $installDir = Split-Path -Path $servicePath -Parent
-
-        # Unregister the service
-        $uninstallResult = (Get-WmiObject -Class Win32_Service -Filter "Name='$ServiceName'").Delete()
-        if ($uninstallResult.ReturnValue -eq 0) {
-            Write-Host "Servicio anterior '$ServiceName' desinstalado."
-        } else {
-            Write-Host "No se pudo desinstalar el servicio anterior (puede que ya no existiera). Codigo: $($uninstallResult.ReturnValue)"
-        }
-        
-        # Give time for the system to release file handles
-        Start-Sleep -Seconds 3
-    }
-
-
-    # --- Get Credentials for the service user ---
-    $scriptPath = $MyInvocation.MyCommand.Path
-    $currentDir = Split-Path -Path $scriptPath -Parent
-
-    $caption = "Credenciales para el Servicio"
-    $message = "Ingrese la cuenta de usuario y contrasena para ejecutar el servicio del agente. Use el formato: DOMINIO\usuario"
-    
-    # Correct way to call PromptForCredential
-    $credential = $host.ui.PromptForCredential($caption, $message, "", "")
-
-    if (-not $credential) {
-        throw "La operacion fue cancelada por el usuario."
-    }
-
-    # --- Create and configure the new service ---
-    Write-Host "Creando el nuevo servicio '$ServiceName'..."
-
-    $serviceParams = @{
-        Name = $ServiceName
-        BinaryPathName = "$currentDir\agent.exe"
-        DisplayName = $ServiceDisplayName
-        Description = "Agente de actualizacion para Softland. Se comunica con el servidor central para ejecutar tareas de actualizacion."
-        StartupType = "Automatic"
-        Credential = $credential
-    }
-    
     New-Service @serviceParams
+} catch {
+    Write-Host "Error al crear el servicio: $($_.Exception.Message)"
+    Read-Host "Presione Enter para salir."
+    exit 1
+}
 
-    Write-Host "Configurando recuperacion del servicio..."
-    sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
 
-    Write-Host "Iniciando el servicio '$ServiceName'..."
-    Start-Service -Name $ServiceName
-    
+# Configurar recuperacion del servicio
+Write-Host "Configurando recuperacion del servicio..."
+sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
+
+# Iniciar el servicio
+Write-Host "Iniciando el servicio '$($ServiceName)'..."
+Start-Service -Name $ServiceName
+
+# Verificar el estado final
+$service = Get-Service -Name $ServiceName
+if ($service.Status -eq "Running") {
     Write-Host ""
     Write-Host "--------------------------------------------------------"
     Write-Host "Instalacion completada!"
-    Write-Host "El servicio '$ServiceDisplayName' se ha instalado y esta en ejecucion."
+    Write-Host "El servicio '$($ServiceDisplayName)' se ha instalado y esta en ejecucion."
     Write-Host "Se ejecutara automaticamente cuando el equipo se inicie."
     Write-Host "--------------------------------------------------------"
-
-} catch {
+} else {
     Write-Host ""
-    Write-Host "Ocurrio un error durante la instalacion:" -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    Write-Host ""
+    Write-Host "--------------------------------------------------------"
+    Write-Host "Error: El servicio '$($ServiceDisplayName)' se instalo pero no se pudo iniciar."
+    Write-Host "Verifique el visor de eventos para mas detalles."
+    Write-Host "--------------------------------------------------------"
 }
-
-Write-Host "Presione Enter para cerrar esta ventana:"
-Read-Host
