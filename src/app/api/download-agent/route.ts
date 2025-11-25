@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
@@ -66,7 +67,12 @@ export async function GET(request: Request) {
         const sevenZipBuffer = await fs.readFile(sevenZipPath);
         zip.file('7za.exe', sevenZipBuffer, { binary: true });
 
-        // 4. Añadir LEEME.txt con instrucciones actualizadas
+        // 4. (CORRECCIÓN) Incluir nssm.exe en el zip
+        const nssmPath = path.join(process.cwd(), 'scripts', 'nssm.exe');
+        const nssmBuffer = await fs.readFile(nssmPath);
+        zip.file('nssm.exe', nssmBuffer, { binary: true });
+
+        // 5. Añadir LEEME.txt con instrucciones actualizadas
         const readmeContent = `
 Paquete de Agente para Clic Actualizador Tools
 =================================================
