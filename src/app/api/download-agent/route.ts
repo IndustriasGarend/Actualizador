@@ -24,13 +24,12 @@ function getCustomServerUrl(): string | null {
     }
 }
 
-
 export async function GET(request: Request) {
     try {
         // Leer los templates de los scripts
         const agentTemplatePath = path.join(process.cwd(), 'scripts', 'agent.ps1.template');
         const installScriptPath = path.join(process.cwd(), 'scripts', 'install-service.ps1.template');
-
+        
         const agentScriptContent = await fs.readFile(agentTemplatePath, 'utf-8');
         const installScriptContent = await fs.readFile(installScriptPath, 'utf-8');
         
@@ -62,7 +61,18 @@ export async function GET(request: Request) {
         // 2. Añadir el config.json generado dinámicamente
         zip.file('config.json', configContent);
         
-        // 3. nssm.exe ya no se incluye. El script de instalación lo descargará.
+        // 3. Incluir nssm.exe desde la carpeta /scripts
+        try {
+            const exePath = path.join(process.cwd(), 'scripts', 'nssm.exe');
+            const exeBuffer = await fs.readFile(exePath);
+            zip.file('nssm.exe', exeBuffer, { binary: true });
+        } catch (e: any) {
+            if (e.code === 'ENOENT') {
+                console.error("CRÍTICO: El archivo 'nssm.exe' no se encontró en la carpeta /scripts. El usuario debe colocarlo allí. No se puede generar el agente.");
+                throw new Error("El archivo 'nssm.exe' no se encontró en la carpeta /scripts del servidor. Por favor, pida al administrador que lo coloque allí.");
+            }
+            throw e; // Relanzar otros errores
+        }
         
         // 4. Añadir LEEME.txt con instrucciones actualizadas
         const readmeContent = `
@@ -70,8 +80,6 @@ Paquete de Agente para Clic Actualizador Tools
 =================================================
 
 La URL de su servidor (${serverUrl}) ya ha sido configurada en el archivo 'config.json'.
-
-El instalador descargará automáticamente 'nssm.exe' desde internet.
 
 Instrucciones de Instalacion:
 -----------------------------
@@ -107,6 +115,6 @@ Instrucciones de Instalacion:
 
     } catch (error) {
         console.error("Error al generar el paquete del agente:", error);
-        return NextResponse.json({ message: 'Error al generar el paquete del agente.' }, { status: 500 });
+        return NextResponse.json({ message: (error as Error).message || 'Error al generar el paquete del agente.' }, { status: 500 });
     }
 }
