@@ -1,105 +1,125 @@
+#requires -version 5
+# Script para instalar y configurar el servicio del Agente de Softland Updater
 
-# install-service.ps1.template
-# Este script se encarga de la lógica de instalación del servicio del agente.
-
-param (
-    [string]$ScriptPath
+param(
+    [string]$BaseUrl
 )
 
-# Colores para la consola
-$SuccessColor = "Green"
-$ErrorColor = "Red"
-$InfoColor = "Yellow"
+# --- INICIO DEL SCRIPT ---
+$ErrorActionPreference = "Stop" # Detiene el script en el primer error
 
-# --- Inicio del Bloque Try/Catch para manejo de errores ---
+$serviceName = "SoftlandUpdaterAgent"
+$serviceDisplayName = "Softland Updater Agent"
+$serviceDescription = "Agente que se comunica con el panel de Softland Updater para ejecutar tareas de actualización."
+
+# Obtener el directorio donde se encuentra este script
+$scriptPath = $PSScriptRoot
+
+# Ruta completa al ejecutable del agente
+$agentExePath = Join-Path -Path $scriptPath -ChildPath "agent.exe"
+
+# --- Comienzo de la lógica de instalación ---
 try {
-    # Nombre del servicio
-    $serviceName = "SoftlandUpdaterAgent"
-
-    # Archivos del agente
-    $agentExecutable = Join-Path $ScriptPath "agent.ps1"
-    $configFile = Join-Path $ScriptPath "config.json"
+    Write-Host "Ejecutando el script de configuracion de PowerShell..."
 
     # --- Desinstalación de versiones anteriores ---
-    Write-Host "Buscando versiones anteriores del servicio..." -ForegroundColor $InfoColor
+    Write-Host ""
+    Write-Host "Buscando versiones anteriores del servicio..."
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($existingService) {
-        Write-Host "Se encontró un servicio existente. Deteniendo y eliminándolo..." -ForegroundColor $InfoColor
-        Stop-Service -Name $serviceName -Force
-        Get-Service -Name $serviceName | Remove-Service -Force
-        Write-Host "Servicio anterior eliminado." -ForegroundColor $SuccessColor
-        Start-Sleep -Seconds 2 # Pequeña pausa para asegurar la liberación de recursos
+        Write-Host "Servicio '$serviceName' encontrado. Deteniendo y eliminando..."
+        Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+        # Esperar un poco para que el servicio se detenga completamente
+        Start-Sleep -Seconds 5
+        Remove-Service -Name $serviceName -Force
+        Write-Host "Servicio anterior eliminado."
     } else {
         Write-Host "No se encontraron servicios anteriores."
     }
     
-    # --- Creación del archivo de configuración (config.json) ---
-    if (-not (Test-Path $configFile)) {
-        Write-Host ""
-        $serverUrl = Read-Host "--> Por favor, ingresa la URL del servidor (ej. http://192.168.1.100:9002)"
-        # Validacion basica de la URL
-        if ($serverUrl -notlike "http*") {
-            throw "La URL ingresada no es valida. Debe comenzar con http o https."
-        }
-        $configContent = @{
-            serverUrl = $serverUrl
-        } | ConvertTo-Json
-        Set-Content -Path $configFile -Value $configContent
-        Write-Host "Archivo de configuracion 'config.json' creado." -ForegroundColor $SuccessColor
-    } else {
-        Write-Host "El archivo 'config.json' ya existe. Omitiendo la solicitud de URL." -ForegroundColor $InfoColor
-    }
-
-    # --- Solicitud de credenciales para el servicio ---
+    # --- Creación de config.json ---
     Write-Host ""
-    Write-Host "--> Se necesitan las credenciales de una cuenta con permisos para ejecutar el servicio." -ForegroundColor $InfoColor
+    $configPath = Join-Path -Path $scriptPath -ChildPath "config.json"
+    $configContent = @{
+        "baseUrl" = $BaseUrl
+    } | ConvertTo-Json
+    
+    # Asegurarse de que la carpeta exista
+    if (-not (Test-Path -Path $scriptPath)) {
+        New-Item -Path $scriptPath -ItemType Directory -Force | Out-Null
+    }
+    
+    Set-Content -Path $configPath -Value $configContent -Encoding UTF8
+    Write-Host "Archivo de configuracion 'config.json' creado."
+
+    # --- Solicitud de credenciales ---
+    Write-Host ""
+    Write-Host "--> Se necesitan las credenciales de una cuenta con permisos para ejecutar el servicio."
     Write-Host "    Esta cuenta debe tener acceso de administrador local y a las rutas de red."
-    $credential = Get-Credential -UserName "DOMINIO\usuario" -Message "Ingresa la cuenta y contrasena para el servicio"
+    $credential = Get-Credential
+    if (-not $credential) {
+        throw "La operacion fue cancelada. No se proporcionaron credenciales."
+    }
 
     # --- Creación del nuevo servicio ---
     Write-Host ""
-    Write-Host "Creando el nuevo servicio '$serviceName'..." -ForegroundColor $InfoColor
+    Write-Host "Creando el nuevo servicio '$serviceName'..."
     New-Service -Name $serviceName `
-                -BinaryPathName "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$agentExecutable`"" `
-                -DisplayName "Softland Updater Agent" `
-                -Description "Agente que se comunica con el panel central para ejecutar actualizaciones de Softland." `
+                -BinaryPathName "$agentExePath" `
+                -DisplayName $serviceDisplayName `
+                -Description $serviceDescription `
                 -StartupType Automatic
-    
-    Write-Host "Servicio creado. Configurando credenciales..."
-    
-    # Configurar el servicio para que se ejecute con las credenciales proporcionadas
-    Set-Service -Name $serviceName -Credential $credential
 
-    # Configurar la recuperación ante fallos
-    $recoveryActions = @(
-        @{ "Type" = "Restart"; "Delay" = 60000 }, # Reiniciar despues de 1 minuto
-        @{ "Type" = "Restart"; "Delay" = 300000 } # Reiniciar despues de 5 minutos
-    )
-    Set-Service -Name $serviceName -RecoveryActions $recoveryActions -RecoveryResetPeriod 86400 # Resetear contador de fallos cada dia
+    Write-Host "Servicio creado. Configurando credenciales..."
+
+    # --- ASIGNACIÓN DE CREDENCIALES (MÉTODO CORRECTO) ---
+    $service = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'"
+    if (-not $service) {
+        throw "No se pudo encontrar el servicio '$serviceName' despues de crearlo."
+    }
+
+    $arguments = @{
+        StartName     = $credential.UserName;
+        StartPassword = $credential.GetNetworkCredential().Password
+    }
+    
+    $result = Invoke-CimMethod -InputObject $service -MethodName "Change" -Arguments $arguments
+    
+    if ($result.ReturnValue -ne 0) {
+        throw "Error al establecer las credenciales del servicio. Codigo de error: $($result.ReturnValue)"
+    }
+    
+    Write-Host "Credenciales asignadas correctamente."
 
     # --- Iniciar el servicio ---
     Write-Host "Iniciando el servicio..."
     Start-Service -Name $serviceName
-
-    # Verificar que el servicio se esté ejecutando
-    $serviceStatus = (Get-Service -Name $serviceName).Status
-    if ($serviceStatus -ne 'Running') {
-        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $serviceStatus"
+    Start-Sleep -Seconds 2 # Darle un momento para que arranque
+    
+    # Verificar que el servicio esté corriendo
+    $finalStatus = Get-Service -Name $serviceName
+    if ($finalStatus.Status -ne 'Running') {
+        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $($finalStatus.Status)"
     }
-
-    Write-Host ""
-    Write-Host ">>> ¡ÉXITO! El servicio del Agente Softland Updater se instaló e inició correctamente." -ForegroundColor $SuccessColor
     
-}
-catch {
-    # --- Bloque de Manejo de Errores ---
+    # --- Mensaje de Éxito ---
     Write-Host ""
-    Write-Host ">>> ¡ERROR!" -ForegroundColor $ErrorColor
-    Write-Host "Ocurrió un error durante la instalación:" -ForegroundColor $ErrorColor
-    # Muestra el mensaje de error de PowerShell
-    Write-Host $_.Exception.Message -ForegroundColor $ErrorColor
+    Write-Host "------------------------------------------------------------------" -ForegroundColor Green
+    Write-Host ">>> ¡ÉXITO! El servicio del Agente Softland Updater se instaló e inició correctamente." -ForegroundColor Green
+    Write-Host "La PC debería aparecer en el panel de control en breve." -ForegroundColor Green
+    Write-Host "------------------------------------------------------------------" -ForegroundColor Green
+    Write-Host ""
     
-    # Terminar el script con un código de error diferente de 0
-    # Esto le indica al .bat que algo salió mal.
+} catch {
+    # --- Manejo de Errores ---
+    Write-Host ""
+    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+    Write-Host ">>> ¡ERROR!" -ForegroundColor Red
+    Write-Host "Ocurrió un error durante la instalación:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+    Write-Host ""
+    
+    # Salir con un código de error para que el .bat lo detecte
     exit 1
 }
