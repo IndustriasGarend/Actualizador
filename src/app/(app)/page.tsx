@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { db } from '@/lib/db';
 import type { PC, Package } from '@/lib/types';
 
-function getPcs(): PC[] {
+async function getPcs(): Promise<PC[]> {
   try {
     const stmt = db.prepare('SELECT * FROM pcs ORDER BY name');
     const result = stmt.all() as PC[] | undefined;
@@ -15,7 +15,7 @@ function getPcs(): PC[] {
   }
 }
 
-function getPackages(): Package[] {
+async function getPackages(): Promise<Package[]> {
   try {
     const stmt = db.prepare('SELECT * FROM packages ORDER BY name');
     const result = stmt.all() as Package[] | undefined;
@@ -27,8 +27,8 @@ function getPackages(): Package[] {
 }
 
 export default async function DashboardPage() {
-  const pcs = getPcs();
-  const packages = getPackages();
+  const pcs = await getPcs();
+  const packages = await getPackages();
 
   return (
     <main className="flex flex-col h-full">

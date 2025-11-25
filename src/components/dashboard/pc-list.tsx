@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { useRouter } from 'next/navigation';
 
 interface PcListProps {
   initialPcs: PC[];
@@ -25,6 +26,7 @@ interface PcListProps {
 }
 
 export function PcList({ initialPcs, packages }: PcListProps) {
+  const router = useRouter();
   const [pcs, setPcs] = useState<PC[]>(initialPcs);
   const [taskData, setTaskData] = useState<{pc: PC, packageId: number} | null>(null);
   const [selectedPcForEdit, setSelectedPcForEdit] = useState<PC | null>(null);
@@ -36,7 +38,7 @@ export function PcList({ initialPcs, packages }: PcListProps) {
 
   const handleCloseUpdateModal = () => {
     setTaskData(null);
-    window.location.reload();
+    router.refresh();
   };
 
   const handleUpdateComplete = (pcId: string, status: PC['status'], taskId?: number | null) => {
@@ -49,6 +51,10 @@ export function PcList({ initialPcs, packages }: PcListProps) {
   const handleEditComplete = (updatedPc: PC) => {
     setPcs(pcs.map(p => p.id === updatedPc.id ? updatedPc : p));
     setSelectedPcForEdit(null);
+  };
+
+  const confirmDelete = (pc: PC) => {
+    setPcToDelete(pc);
   };
 
   const handleDeletePc = async () => {
@@ -104,7 +110,7 @@ export function PcList({ initialPcs, packages }: PcListProps) {
             packages={packages}
             onUpdateClick={(packageId) => handleUpdate(pc, packageId)}
             onEditClick={() => setSelectedPcForEdit(pc)}
-            onDeleteClick={() => setPcToDelete(pc)}
+            onDeleteClick={() => confirmDelete(pc)}
             onToggleStatus={() => handleTogglePcStatus(pc)}
           />
         ))}

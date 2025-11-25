@@ -34,7 +34,8 @@ import {
   RefreshCw,
   ToggleRight,
   Cog,
-  Package
+  Package,
+  Download
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -202,7 +203,7 @@ export default function HelpPage() {
                             <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden, pero el agente aún no la ha comenzado.</li>
                             <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente está ejecutando una tarea en este momento.</li>
                             <li><Badge variant="destructive">Error</Badge>: Ocurrió un problema durante la última tarea. Revisa el historial.</li>
-                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea fue cancelada manualmente.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea fue cancelada manually.</li>
                             <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC está inactiva y no recibirá nuevas tareas.</li>
                          </ul>
                     </li>
