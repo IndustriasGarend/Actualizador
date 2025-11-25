@@ -259,7 +259,7 @@ export default function HelpPage() {
                         <strong>Rutas para variable de entorno PATH:</strong> Permite añadir rutas al PATH del sistema de las PCs cliente de forma centralizada. Separa cada ruta con un punto y coma (;). El agente se asegurara de no añadir rutas duplicadas.
                     </li>
                      <li>
-                        <strong>Usuario Administrador:</strong> Define la cuenta de usuario con la que se debe instalar el servicio del agente. Es crucial que esta cuenta tenga permisos de administrador local en la PC y acceso a la ruta de red. El formato debe ser `DOMINIO\\usuario` (ej. `ING\\admin.softland`).
+                        <strong>Usuario del Servicio:</strong> Define la cuenta de usuario con la que se debe instalar el servicio del agente. Es crucial que esta cuenta tenga permisos de administrador local en la PC y acceso a la ruta de red. El formato debe ser `DOMINIO\\usuario` (ej. `ING\\admin.softland`).
                     </li>
                 </ul>
 
@@ -277,13 +277,13 @@ export default function HelpPage() {
         content: (
             <div className="space-y-4">
                 <p>
-                El agente es un pequeño programa que se ejecuta en cada PC cliente y se comunica con el servidor central. Su instalacion es un paso unico y fundamental.
+                El agente es un pequeño programa que se ejecuta en cada PC cliente y se comunica con el servidor central. Su instalacion es un paso unico y fundamental. El ID de la PC se toma automaticamente del nombre del equipo (hostname).
                 </p>
 
                 <h4 className="font-semibold text-lg pt-2 border-t">Pasos para la Instalacion</h4>
                 <ol className="list-decimal space-y-4 pl-6">
                     <li>
-                        <strong>Descargar el Paquete de Instalacion:</strong>
+                        <strong>Descargar el Paquete de Instalacion Generico:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>En el panel de control, ve a <strong>Configuracion</strong> y haz clic en el boton <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
                         </ul>
@@ -332,20 +332,20 @@ export default function HelpPage() {
         )
     },
     {
-        title: "Auto-Actualizacion del Agente y Logica de Funcionamiento",
+        title: "Auto-Actualizacion y Logica del Agente",
         icon: <Cog className="mr-4 h-6 w-6 text-orange-500" />,
         content: (
             <div className="space-y-4">
                 <p>
                 Para mantener el sistema de gestion eficiente, el propio agente tiene la capacidad de actualizarse a si mismo y sigue una logica de operacion clara.
                 </p>
-                <h4 className="font-semibold text-lg pt-2 border-t">Paso 1: Recoleccion de Datos y Comunicacion</h4>
+                <h4 className="font-semibold text-lg pt-2 border-t">Paso 1: Recoleccion de Datos y Auto-Registro</h4>
                  <ul className="list-disc space-y-3 pl-6">
                     <li>
                         El agente inicia y recolecta informacion clave: su propia version, el nombre del equipo (`hostname`), la IP actual, el usuario con sesion activa y un inventario basico de hardware.
                     </li>
                      <li>
-                        Envía toda esta informacion al servidor para solicitar instrucciones. Si es la primera vez que se conecta, el servidor lo registrara como una nueva PC.
+                        Envía toda esta informacion al servidor para solicitar instrucciones. Si es la primera vez que se conecta (es decir, el servidor no reconoce su `hostname`), el servidor lo **registrara automaticamente** como una nueva PC.
                     </li>
                 </ul>
                  <h4 className="font-semibold text-lg pt-2 border-t">Paso 2: Recepcion y Priorizacion de Ordenes</h4>
@@ -354,7 +354,7 @@ export default function HelpPage() {
                         El servidor analiza los datos y decide que hacer, siguiendo un orden de prioridad estricto:
                          <ol className="list-decimal space-y-2 pl-5 mt-2">
                              <li><strong>Auto-Actualizacion del Agente:</strong> Si la version del agente es antigua, el servidor ordena una auto-actualizacion. Esta es la maxima prioridad.</li>
-                             <li><strong>Cancelacion de Tarea:</strong> Si una tarea activa fue cancelada manually, el servidor ordena detenerla.</li>
+                             <li><strong>Cancelacion de Tarea:</strong> Si una tarea activa fue cancelada manualmente, el servidor ordena detenerla.</li>
                              <li><strong>Actualizacion de Softland:</strong> Si hay una actualizacion de Softland pendiente, el servidor envia la orden.</li>
                              <li><strong>Ninguna Tarea:</strong> Si no hay nada que hacer, el agente se pone en espera.</li>
                          </ol>
@@ -474,3 +474,5 @@ export default function HelpPage() {
     </main>
   );
 }
+
+    
