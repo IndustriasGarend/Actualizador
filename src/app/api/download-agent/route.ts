@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     try {
         // Leer los templates de los scripts
         const agentTemplatePath = path.join(process.cwd(), 'scripts', 'agent.ps1.template');
-        const installScriptPath = path.join(process.cwd(), 'scripts', 'install-service.ps1.template');
+        const installScriptPath = path.join(process.cwd(), 'scripts', 'install-service.ps1');
 
         const agentScriptContent = await fs.readFile(agentTemplatePath, 'utf-8');
         const installScriptContent = await fs.readFile(installScriptPath, 'utf-8');
@@ -62,17 +62,12 @@ export async function GET(request: Request) {
         // 2. Añadir el config.json generado dinámicamente
         zip.file('config.json', configContent);
         
-        // 3. Incluir 7za.exe en el zip para que este disponible para el agente
-        const sevenZipPath = path.join(process.cwd(), 'scripts', '7za.exe');
-        const sevenZipBuffer = await fs.readFile(sevenZipPath);
-        zip.file('7za.exe', sevenZipBuffer, { binary: true });
-
-        // 4. (CORRECCIÓN) Incluir nssm.exe en el zip
-        const nssmPath = path.join(process.cwd(), 'scripts', 'nssm.exe');
-        const nssmBuffer = await fs.readFile(nssmPath);
-        zip.file('nssm.exe', nssmBuffer, { binary: true });
-
-        // 5. Añadir LEEME.txt con instrucciones actualizadas
+        // 3. Incluir nssm.exe en el zip
+        const exePath = path.join(process.cwd(), 'scripts', 'nssm.exe');
+        const exeBuffer = await fs.readFile(exePath);
+        zip.file('nssm.exe', exeBuffer, { binary: true });
+        
+        // 4. Añadir LEEME.txt con instrucciones actualizadas
         const readmeContent = `
 Paquete de Agente para Clic Actualizador Tools
 =================================================
