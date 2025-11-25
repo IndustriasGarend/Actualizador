@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { PC } from '@/lib/types';
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
         updateQuery += ", loggedUser = ?";
         params.push(loggedUser);
     }
+    // Corregido para leer del objeto anidado 'hardwareInfo'
     if(hardwareInfo) {
         updateQuery += ", osName = ?, osVersion = ?, cpuModel = ?, cpuCores = ?, totalMemory = ?, disks = ?";
         params.push(
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
             hardwareInfo.cpuModel || null,
             hardwareInfo.cpuCores || null,
             hardwareInfo.totalMemory || null,
-            hardwareInfo.disks || null,
+            hardwareInfo.disks || null
         );
     }
     if (pcStatus !== 'En progreso') {
