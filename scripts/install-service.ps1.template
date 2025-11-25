@@ -1,15 +1,10 @@
-#Requires -RunAsAdministrator
 
-# --- Configuración ---
-$serviceName = "ClicActualizadorToolsAgent"
-$displayName = "Clic Actualizador Tools Agent"
-$description = "Agente que se comunica con el servidor de Clic Actualizador Tools para ejecutar tareas remotas."
-# --- Fin Configuración ---
+# Necesario para que el script se ejecute a sí mismo con bypass
+# y para encontrar la ruta de los otros archivos.
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptDir = Split-Path $scriptPath -Parent
 
-# Define la ruta base donde se encuentra el script
-$basePath = $PSScriptRoot
-
-#region Funciones Auxiliares
+# --- Auto-elevación y bypass de política de ejecución ---
 function Is-Admin {
     try {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -17,154 +12,178 @@ function Is-Admin {
         return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     }
     catch {
-        Write-Warning "No se pudo determinar el rol del usuario. Asumiendo que no es administrador."
+        Write-Warning "Error al verificar permisos: $_. Saltando la comprobación."
+        return $false # Asumir no-admin si falla la comprobación
+    }
+}
+
+# Si no se está ejecutando como administrador, se reinicia con permisos.
+if (-not (Is-Admin)) {
+    try {
+        $args = "& `"$scriptPath`""
+        Start-Process powershell -Verb RunAs -ArgumentList $args
+        exit # Salir del script actual
+    }
+    catch {
+        Write-Error "¡Acceso denegado! Por favor, ejecuta este script como Administrador (clic derecho > Ejecutar con PowerShell)."
+        Read-Host "Presiona Enter para salir..."
+        exit 1
+    }
+}
+
+# Si la ejecución del script es restringida, se vuelve a lanzar con la política de bypass
+if ((Get-ExecutionPolicy) -ne "Unrestricted") {
+    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        $arguments = "& '$scriptPath'"
+        Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`"" -Verb RunAs
+        exit
+    }
+}
+# --- Fin de Auto-elevación ---
+
+# --- Variables de Configuración ---
+$serviceName = "ClicActualizadorToolsAgent"
+$serviceDisplayName = "Clic Actualizador Tools Agent"
+$serviceDescription = "Agente de Clic Actualizador Tools para la gestión remota de tareas y actualizaciones."
+$nssmExe = Join-Path $scriptDir "nssm.exe"
+$agentScript = Join-Path $scriptDir "agent.ps1"
+
+# --- Funciones ---
+function Write-Header($message) {
+    Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host $message -ForegroundColor Yellow
+    Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+}
+
+function Download-NSSM {
+    $nssmZipPath = Join-Path $scriptDir "nssm.zip"
+    $nssmUrl = "https://nssm.cc/release/nssm-2.24.zip" # URL oficial de NSSM
+
+    if (Test-Path $nssmExe) {
+        Write-Host ">>> 'nssm.exe' ya existe. Omitiendo descarga." -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host ">>> Descargando nssm.exe desde $nssmUrl..."
+    try {
+        Invoke-WebRequest -Uri $nssmUrl -OutFile $nssmZipPath -UseBasicParsing
+        Write-Host ">>> Descarga completada. Extrayendo..."
+        
+        Expand-Archive -Path $nssmZipPath -DestinationPath $scriptDir -Force
+        
+        # Encontrar la ruta correcta del .exe dependiendo de la arquitectura
+        $nssmArchPath = "nssm-2.24\win64\nssm.exe"
+        if ([System.Environment]::Is64BitOperatingSystem -ne $true) {
+            $nssmArchPath = "nssm-2.24\win32\nssm.exe"
+        }
+        $nssmSource = Join-Path $scriptDir $nssmArchPath
+
+        # Moverlo al directorio raíz y limpiar
+        Move-Item -Path $nssmSource -Destination $nssmExe -Force
+        Remove-Item -Path (Join-Path $scriptDir "nssm-2.24") -Recurse -Force
+        Remove-Item -Path $nssmZipPath -Force
+
+        Write-Host ">>> 'nssm.exe' extraído y preparado." -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Error "¡ERROR! No se pudo descargar o extraer 'nssm.exe'. Verifica tu conexión a internet."
+        Write-Error $_
         return $false
     }
 }
 
-function Show-MessageAndExit {
-    param(
-        [string]$Title,
-        [string]$Message,
-        [string]$FinalStatus,
-        [string]$PauseMessage = "Presiona Enter para salir..."
-    )
-    Write-Host "`n"
-    Write-Host "------------------------------------------------------" -ForegroundColor Yellow
-    Write-Host " $Title" -ForegroundColor Yellow
-    Write-Host " $Message"
-    Write-Host "------------------------------------------------------" -ForegroundColor Yellow
-    Write-Host " $FinalStatus"
-    Read-Host -Prompt $PauseMessage
+# --- Flujo Principal de Instalación ---
+Clear-Host
+Set-Location $scriptDir
+Write-Header "INSTALADOR DEL SERVICIO: Clic Actualizador Tools Agent"
+
+# 1. Descargar y preparar NSSM
+if (-not (Download-NSSM)) {
+    Read-Host "Presiona Enter para salir..."
     exit 1
 }
-#endregion
 
-# --- Flujo Principal ---
-
-# 0. Bypass de Política de Ejecución (si es necesario)
-# Vuelve a lanzar el script con la política de ejecución adecuada para esta sesión.
-# Esto asegura que el script se ejecute incluso en sistemas con políticas restrictivas.
-if ($MyInvocation.CommandOrigin -eq 'File' -and $MyInvocation.Line -notlike '*-ExecutionPolicy Bypass*') {
-    try {
-        $params = "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
-        Start-Process pwsh -Verb RunAs -ArgumentList $params
-        exit
-    }
-    catch {
-        Show-MessageAndExit -Title "ERROR DE INICIO" -Message "No se pudo reiniciar el script con PowerShell Core (pwsh). Intentando con Windows PowerShell..." -FinalStatus ""
-        try {
-            $params = "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
-            Start-Process powershell -Verb RunAs -ArgumentList $params
-            exit
-        }
-        catch {
-            Show-MessageAndExit -Title "ERROR CRÍTICO" -Message "No se pudo iniciar ni con 'pwsh' ni con 'powershell'. Asegúrate de que PowerShell esté en el PATH del sistema." -FinalStatus "INSTALACIÓN FALLIDA"
-        }
-    }
-}
-
-
-Clear-Host
-Write-Host "------------------------------------------------------" -ForegroundColor Green
-Write-Host " INSTALADOR DEL SERVICIO: Clic Actualizador Tools Agent" -ForegroundColor Green
-Write-Host "------------------------------------------------------" -ForegroundColor Green
-Write-Host ""
-
-# 1. Verificar Permisos de Administrador
-if (-not (Is-Admin)) {
-    Show-MessageAndExit -Title "ACCESO DENEGADO" -Message "Por favor, ejecuta este script como Administrador (clic derecho > Ejecutar con PowerShell)." -FinalStatus "INSTALACIÓN FALLIDA"
-}
-Write-Host ">>> Permisos de Administrador verificados." -ForegroundColor Green
-
-# 2. Verificar que nssm.exe exista
-$nssmPath = Join-Path $basePath "nssm.exe"
-if (-not (Test-Path $nssmPath)) {
-    Show-MessageAndExit -Title "¡ERROR CRÍTICO!" -Message "No se encontró 'nssm.exe' en la carpeta. Asegúrate de que 'nssm.exe' esté en el mismo directorio que este script." -FinalStatus "LA INSTALACIÓN NO PUDO COMPLETARSE."
-}
-Write-Host ">>> 'nssm.exe' encontrado." -ForegroundColor Green
-
-# 3. Reinstalación: Verificar si el servicio ya existe y limpiarlo
+# 2. Verificar si el servicio ya existe y reinstalar si es necesario
 $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if ($service) {
-    Write-Host ">>> El servicio '$serviceName' ya existe. Procediendo a reinstalar..." -ForegroundColor Yellow
-
+    Write-Host ""
+    Write-Host "El servicio '$serviceName' ya existe. Intentando reinstalar..." -ForegroundColor Yellow
+    
     try {
-        # Obtener el PID del proceso del servicio
+        # Detener forzosamente el proceso asociado si está corriendo
         $serviceProcess = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'"
-        if ($serviceProcess -and $serviceProcess.ProcessId -ne 0) {
-            Write-Host "    - Terminando el proceso del servicio existente (PID: $($serviceProcess.ProcessId))..."
-            Stop-Process -Id $serviceProcess.ProcessId -Force -ErrorAction Stop
+        if ($serviceProcess.ProcessId -ne 0) {
+            Write-Host ">>> Finalizando proceso del servicio (PID: $($serviceProcess.ProcessId))..."
+            Stop-Process -Id $serviceProcess.ProcessId -Force -ErrorAction SilentlyContinue
         }
-
-        # Pausa para dar tiempo al OS a procesar la terminación del proceso
-        Write-Host "    - Esperando 2 segundos para asegurar la liberación de recursos..."
-        Start-Sleep -Seconds 2
-
-        Write-Host "    - Eliminando la definición del servicio anterior..."
-        sc.exe delete "$serviceName" | Out-Null
         
-        # Esperar un poco para que la eliminación se complete
+        # Detener el servicio (como respaldo)
+        Write-Host ">>> Deteniendo el servicio..."
+        Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+        
+        # Dar tiempo al SO para procesar la detención
+        Start-Sleep -Seconds 3
+
+        # Eliminar el servicio
+        Write-Host ">>> Eliminando definición del servicio anterior..."
+        & $nssmExe remove $serviceName confirm
+        
         Start-Sleep -Seconds 2
         
+        # Verificar que se eliminó
         $serviceCheck = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
         if ($serviceCheck) {
-            Show-MessageAndExit -Title "¡ERROR!" -Message "No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente desde 'services.msc' y vuelve a intentarlo." -FinalStatus "REINSTALACIÓN FALLIDA"
+            throw "No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente con 'sc.exe delete $serviceName' y vuelve a intentarlo."
         }
-
+        
         Write-Host ">>> Servicio anterior eliminado correctamente." -ForegroundColor Green
-    }
-    catch {
-        Show-MessageAndExit -Title "¡ERROR INESPERADO!" -Message "Ocurrió un error al intentar limpiar el servicio anterior: $($_.Exception.Message)" -FinalStatus "REINSTALACIÓN FALLIDA"
+    } catch {
+        Write-Error "¡ERROR! Ocurrió un problema durante la reinstalación."
+        Write-Error $_.Exception.Message
+        Read-Host "Presiona Enter para salir..."
+        exit 1
     }
 }
 
-# 4. Instalación del Servicio
+# 3. Instalar el nuevo servicio
 try {
-    Write-Host ">>> Instalando el servicio '$displayName'..."
+    Write-Host ""
+    Write-Host ">>> Instalando el servicio '$serviceName'..."
     
-    $agentScriptPath = Join-Path $basePath "agent.ps1"
-    
-    # Instalar el servicio
-    & $nssmPath install $serviceName "powershell.exe" "-ExecutionPolicy Bypass -File `"$agentScriptPath`""
-    
-    # Configurar detalles del servicio
-    & $nssmPath set $serviceName DisplayName $displayName
-    & $nssmPath set $serviceName Description $description
-    & $nssmPath set $serviceName Start SERVICE_AUTO_START
+    # Instalar
+    & $nssmExe install $serviceName "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    # Configurar argumentos
+    & $nssmExe set $serviceName AppParameters "-ExecutionPolicy Bypass -NoProfile -File `"$agentScript`""
+    & $nssmExe set $serviceName AppDirectory $scriptDir
+    & $nssmExe set $serviceName Description $serviceDescription
+    & $nssmExe set $serviceName DisplayName $serviceDisplayName
+    & $nssmExe set $serviceName Start SERVICE_AUTO_START
+    & $nssmExe set $serviceName AppStopMethodSkip 6
     
     Write-Host ">>> Servicio instalado. Iniciando..."
     
     # Iniciar el servicio
     Start-Service -Name $serviceName
     
-    # Pausa para dar tiempo al servicio a iniciar
-    Start-Sleep -Seconds 3
-    
     # Verificar el estado
+    Start-Sleep -seconds 2
     $finalService = Get-Service -Name $serviceName
-    if ($finalService.Status -eq 'Running') {
-        Write-Host ""
-        Write-Host "******************************************************" -ForegroundColor Green
-        Write-Host "* ¡ÉXITO! Servicio instalado y en ejecución.        *" -ForegroundColor Green
-        Write-Host "******************************************************" -ForegroundColor Green
-    } else {
-        $logContent = ""
-        $logPath = "C:\Windows\Temp\ClicUpdaterAgent.log"
-        if (Test-Path $logPath) {
-            $logContent = Get-Content $logPath -Raw
-        }
-        Show-MessageAndExit -Title "¡ERROR!" -Message "El servicio se instaló pero no pudo iniciarse. Estado actual: $($finalService.Status). Revisa el log en '$logPath' para más detalles.`n`n$logContent" -FinalStatus "INSTALACIÓN FALLIDA"
+    if ($finalService.Status -ne "Running") {
+        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $($finalService.Status)"
     }
-}
-catch {
-    Show-MessageAndExit -Title "¡ERROR DE INSTALACIÓN!" -Message "Ocurrió un problema durante la instalación: $($_.Exception.Message)" -FinalStatus "INSTALACIÓN FALLIDA"
-}
+    
+    Write-Host ""
+    Write-Host "¡ÉXITO! Servicio '$serviceName' instalado y en ejecución." -ForegroundColor Green
+    Write-Host "RECUERDA: Debes configurar la cuenta de inicio de sesión del servicio para acceder a recursos de red." -ForegroundColor Cyan
 
-# 5. Mensaje Final
-Write-Host ""
-Write-Host "------------------------------------------------------" -ForegroundColor Yellow
-Write-Host " INSTALACIÓN FINALIZADA."
-Write-Host " (Puedes cerrar esta ventana)"
-Write-Host "------------------------------------------------------" -ForegroundColor Yellow
-Read-Host -Prompt "Presiona Enter para cerrar esta ventana..."
+} catch {
+    Write-Host ""
+    Write-Error "¡ERROR! Ocurrió un problema durante la instalación."
+    Write-Error $_.Exception.Message
+    Write-Host "El Log del agente se encuentra en 'C:\Windows\Temp\ClicUpdaterAgent.log' si el servicio logró ejecutarse brevemente." -ForegroundColor yellow
+} finally {
+    Write-Header "INSTALACION FINALIZADA."
+    Write-Host "(Puedes cerrar esta ventana)" -ForegroundColor Yellow
+    Read-Host "Presiona Enter para cerrar esta ventana..."
+}

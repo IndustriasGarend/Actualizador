@@ -62,18 +62,7 @@ export async function GET(request: Request) {
         // 2. Añadir el config.json generado dinámicamente
         zip.file('config.json', configContent);
         
-        // 3. Incluir nssm.exe en el zip
-        try {
-            const exePath = path.join(process.cwd(), 'scripts', 'nssm.exe');
-            const exeBuffer = await fs.readFile(exePath);
-            zip.file('nssm.exe', exeBuffer, { binary: true });
-        } catch (e: any) {
-            if (e.code === 'ENOENT') {
-                console.error("CRÍTICO: El archivo 'nssm.exe' no se encontró en la carpeta /scripts. No se puede generar el agente.");
-                throw new Error("No se encontró el archivo 'nssm.exe' en el servidor.");
-            }
-            throw e; // Relanza otros errores
-        }
+        // 3. nssm.exe ya no se incluye. El script de instalación lo descargará.
         
         // 4. Añadir LEEME.txt con instrucciones actualizadas
         const readmeContent = `
@@ -81,6 +70,8 @@ Paquete de Agente para Clic Actualizador Tools
 =================================================
 
 La URL de su servidor (${serverUrl}) ya ha sido configurada en el archivo 'config.json'.
+
+El instalador descargará automáticamente 'nssm.exe' desde internet.
 
 Instrucciones de Instalacion:
 -----------------------------
