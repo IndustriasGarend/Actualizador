@@ -33,7 +33,8 @@ import {
   ToggleLeft,
   RefreshCw,
   ToggleRight,
-  Cog
+  Cog,
+  Package
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -160,167 +161,143 @@ export default function HelpPage() {
 
   const helpSections = [
     {
-        title: "Introduccion al Sistema",
+        title: "Introducción a Clic Actualizador Tools",
         icon: <Rocket className="mr-4 h-6 w-6 text-blue-500" />,
         content: (
             <>
                 <p>
-                ¡Bienvenido a <strong>Softland Updater</strong>! Este sistema esta diseñado para ser tu centro de control centralizado para gestionar y desplegar actualizaciones del software Softland en todas las computadoras de tu empresa de manera eficiente y segura.
+                ¡Bienvenido a <strong>Clic Actualizador Tools</strong>! Este sistema está diseñado para ser tu centro de control para desplegar software, ejecutar comandos y gestionar actualizaciones en todas las computadoras de tu empresa de manera eficiente.
                 </p>
                 <p>
-                El objetivo es simple: tener una vision clara del estado de actualizacion de cada equipo, obtener un inventario basico de su hardware y poder lanzar actualizaciones remotas con un solo clic, sin necesidad de acceder fisicamente a cada maquina.
+                El objetivo es tener una visión clara del estado de cada equipo y poder lanzar tareas remotas con un solo clic, sin necesidad de acceder físicamente a cada máquina.
                 </p>
                  <Alert variant="default" className="mt-4">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Funcionamiento On-Premise</AlertTitle>
                     <AlertDescription>
-                        Este sistema esta diseñado para funcionar 100% dentro de tu red local (on-premise). No depende de servicios en la nube. La comunicacion se realiza entre este panel de control y un pequeño "agente" que se instala en cada PC cliente.
+                        Este sistema está diseñado para funcionar 100% dentro de tu red local (on-premise). La comunicación se realiza entre este panel de control y un pequeño "agente" que se instala en cada PC cliente.
                     </AlertDescription>
                 </Alert>
             </>
         )
     },
     {
-        title: "Guia del Panel de Control (Dashboard)",
+        title: "Guía del Panel de Control (Dashboard)",
         icon: <Computer className="mr-4 h-6 w-6 text-green-500" />,
         content: (
              <div className="space-y-4">
                 <p>
-                El panel de control es tu vista principal. Aqui veras una tarjeta por cada PC registrada en el sistema.
+                El panel de control es tu vista principal. Aquí verás una tarjeta por cada PC registrada en el sistema.
                 </p>
                 
                 <h4 className="font-semibold text-lg pt-2 border-t">Entendiendo la Tarjeta de una PC</h4>
                 <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Nombre de la PC:</strong> Es el `hostname` del equipo. Al hacer clic, accederas a una vista detallada con el inventario de hardware.
+                        <strong>Nombre de la PC:</strong> Es el `hostname` del equipo. Al hacer clic, accederás a una vista detallada con el inventario de hardware.
                     </li>
                     <li>
-                        <strong>Estado (<Badge variant="secondary" className="text-xs">Badge</Badge>):</strong> La etiqueta de color en la esquina superior derecha te indica el estado actual:
+                        <strong>Estado (<Badge variant="secondary" className="text-xs">Badge</Badge>):</strong> La etiqueta de color te indica el estado actual:
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li><Badge className="bg-accent text-accent-foreground">Actualizado</Badge>: La PC tiene la ultima version disponible.</li>
-                            <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden de actualizacion, pero el agente aun no la ha comenzado.</li>
-                            <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente esta ejecutando una actualizacion en este momento.</li>
-                            <li><Badge variant="destructive">Error</Badge>: Ocurrio un problema durante el ultimo intento de actualizacion. Revisa el historial para mas detalles.</li>
-                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea de actualizacion fue cancelada manually desde el panel.</li>
-                            <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC esta inactiva y no recibira ordenes de actualizacion.</li>
+                            <li><Badge className="bg-accent text-accent-foreground">Actualizado</Badge>: La última tarea se completó con éxito.</li>
+                            <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden, pero el agente aún no la ha comenzado.</li>
+                            <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente está ejecutando una tarea en este momento.</li>
+                            <li><Badge variant="destructive">Error</Badge>: Ocurrió un problema durante la última tarea. Revisa el historial.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea fue cancelada manualmente.</li>
+                            <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC está inactiva y no recibirá nuevas tareas.</li>
                          </ul>
                     </li>
                      <li>
-                        <strong>Alias, Ubicacion y Usuario Logueado:</strong> Muestran informacion adicional para identificar la PC, su ubicacion fisica y el ultimo usuario que inicio sesion.
+                        <strong>Alias, Ubicación y Usuario Logueado:</strong> Muestran información adicional para identificar la PC.
                     </li>
                     <li>
-                        <strong>Version App (<GitBranch className="inline h-4 w-4"/>):</strong> Muestra el identificador de la version de Softland que la PC tiene instalada.
+                        <strong>Versión App (<GitBranch className="inline h-4 w-4"/>):</strong> Muestra el identificador de la versión de la última actualización de archivos realizada.
                     </li>
                     <li>
-                        <strong>Version Agente (<RefreshCw className="inline h-4 w-4"/>):</strong> Muestra la version del agente instalado. Si aparece en <span className="text-red-500 font-bold">rojo</span>, significa que el agente esta desactualizado. El sistema intentara actualizarlo automaticamente.
+                        <strong>Versión Agente (<RefreshCw className="inline h-4 w-4"/>):</strong> Muestra la versión del agente. Si aparece en <span className="text-red-500 font-bold">rojo</span>, el sistema intentará actualizarlo automáticamente.
                     </li>
                     <li>
-                        <strong>Boton "Actualizar Ahora":</strong> Este es el disparador principal. Al hacer clic, se crea una tarea de actualizacion.
-                    </li>
-                    <li>
-                        <strong>Menu de Acciones (⋮):</strong> Este menu te da opciones adicionales:
-                         <ul className="list-[square] space-y-2 pl-5 mt-2 text-sm">
-                            <li><span className="inline-flex items-center gap-2"><strong>Editar:</strong></span> Permite cambiar el alias y la ubicacion de la PC.</li>
-                             <li><span className="inline-flex items-center gap-2"><ToggleLeft className="h-4 w-4"/> <strong>Deshabilitar/Habilitar:</strong></span> Permite marcar una PC como inactiva.</li>
-                             <li><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive"/> <strong>Eliminar:</strong></span> Borra permanentemente la PC del sistema.</li>
-                         </ul>
+                        <strong>Botón "Actualizar / Instalar":</strong> Este es el disparador principal. Al hacer clic, se despliega un menú con todos los paquetes de software disponibles para enviar a esa PC.
                     </li>
                 </ul>
-
-                <Alert variant="default" className="mt-4">
-                    <ServerCrash className="h-4 w-4" />
-                    <AlertTitle>¿No ves ninguna PC?</AlertTitle>
-                    <AlertDescription>
-                        Si el panel esta vacio, significa que aun no se ha registrado ninguna PC. Dirigete a la seccion de <strong>Instalacion del Agente</strong> para aprender como hacerlo.
-                    </AlertDescription>
-                </Alert>
             </div>
         )
     },
     {
-        title: "Guia de la Pagina de Configuracion",
-        icon: <Settings className="mr-4 h-6 w-6 text-slate-600" />,
+        title: "Gestión de Paquetes",
+        icon: <Package className="mr-4 h-6 w-6 text-orange-500" />,
         content: (
             <div className="space-y-4">
                 <p>
-                Esta es la "sala de maquinas" del sistema. Aqui defines como funcionaran las actualizaciones y gestionas la lista de equipos.
+                Esta es la "sala de máquinas" del sistema. Aquí defines los paquetes de software, actualizaciones o comandos que quieres desplegar. Puedes crear tantos como necesites.
                 </p>
 
-                <h4 className="font-semibold text-lg pt-2 border-t">Parametros Generales</h4>
+                <h4 className="font-semibold text-lg pt-2 border-t">Tipos de Paquetes</h4>
+                <p>Al crear un nuevo paquete, debes elegir su tipo:</p>
                 <ul className="list-disc space-y-3 pl-6">
                     <li>
-                        <strong>Ruta de archivo de actualizacion:</strong> La ruta de red completa (UNC Path) donde el agente buscara el archivo comprimido con la actualizacion (ej. `\\\\servidor\\updates\\update.7z`).
+                        <strong>Actualización de Archivos:</strong> Es el método original. Ideal para actualizaciones que solo requieren descomprimir un archivo (.zip, .7z) y copiar su contenido a una carpeta de destino. Perfecto para sistemas como Softland.
                     </li>
                      <li>
-                        <strong>Directorio de instalacion de Softland:</strong> La ruta local en las PCs cliente donde esta instalado Softland (ej. `C:\\SoftlandERP`).
+                        <strong>Ejecutar Script:</strong> Permite ejecutar un archivo de script (<code>.bat</code> o <code>.ps1</code>) en la PC cliente. El script debe estar en una carpeta de red compartida. Es ideal para instalaciones desatendidas (ejecutables .exe con parámetros silenciosos, .msi) o tareas de configuración complejas.
                     </li>
                      <li>
-                        <strong>Nombres de los servicios:</strong> Define los servicios de Windows que deben detenerse antes de actualizar. **Puedes listar varios servicios separandolos por comas** (ej: `Servicio1,Servicio POS`).
-                    </li>
-                     <li>
-                        <strong>Rutas para variable de entorno PATH:</strong> Permite añadir rutas al PATH del sistema de las PCs cliente de forma centralizada. Separa cada ruta con un punto y coma (;). El agente se asegurara de no añadir rutas duplicadas.
+                        <strong>Comando PowerShell:</strong> Ejecuta una línea de comando directamente en una terminal de PowerShell en la PC cliente. Es la forma más rápida y directa de realizar tareas simples, como usar <strong>Winget</strong> (ej. <code>winget upgrade --all --accept-package-agreements</code>) o forzar políticas de grupo (<code>gpupdate /force</code>).
                     </li>
                 </ul>
                 <Alert variant="default">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Importante: Permisos de Red</AlertTitle>
+                    <AlertTitle>¡Importante! Instaladores Desatendidos</AlertTitle>
                     <AlertDescription>
-                        El servicio del agente, para poder acceder a la ruta de red, debe ejecutarse con una cuenta de dominio que tenga permisos de lectura sobre esa carpeta compartida. Esta configuración se realiza manualmente en cada PC cliente después de la instalación.
+                        Para instalar programas usando "Ejecutar Script", asegúrate de que el instalador soporte un modo silencioso o desatendido (ej. <code>setup.exe /S</code>, <code>msiexec /i install.msi /qn</code>). Debes incluir estos comandos dentro de tu archivo <code>.bat</code> o <code>.ps1</code>.
                     </AlertDescription>
                 </Alert>
-                <h4 className="font-semibold text-lg pt-2 border-t">Descargar Instalador del Agente (<HardDriveDownload className="inline h-4 w-4"/>)</h4>
-                 <ul className="list-disc space-y-3 pl-6">
-                    <li>Esta seccion te permite descargar el **paquete de instalacion generico** para el agente.</li>
-                    <li>Este paquete `.zip` es el mismo para todas las PCs. Descargalo una vez y usalo en todos los equipos que quieras registrar.</li>
-                 </ul>
             </div>
         )
     },
     {
-        title: "Tutorial: Instalacion del Agente en una PC Cliente",
+        title: "Tutorial: Instalación del Agente en una PC Cliente",
         icon: <FileTerminal className="mr-4 h-6 w-6 text-cyan-500" />,
         content: (
             <div className="space-y-4">
                 <p>
-                El agente es un pequeño programa que se ejecuta en cada PC cliente y se comunica con el servidor central. Su instalacion es un paso unico y fundamental.
+                El agente es un pequeño programa que se ejecuta en cada PC cliente y se comunica con el servidor central. Su instalación es un paso único y fundamental.
                 </p>
 
-                <h4 className="font-semibold text-lg pt-2 border-t">Pasos para la Instalacion</h4>
+                <h4 className="font-semibold text-lg pt-2 border-t">Pasos para la Instalación</h4>
                 <ol className="list-decimal space-y-4 pl-6">
                     <li>
-                        <strong>Descargar el Paquete de Instalacion:</strong>
+                        <strong>Descargar el Paquete de Instalación:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>En el panel de control, ve a <strong>Configuracion</strong> y haz clic en el boton <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
+                            <li>En la página de <strong>Ayuda</strong>, haz clic en el botón <strong>"Descargar Instalador del Agente (.zip)"</strong>.</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Preparar la PC Cliente:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                            <li>Copia el archivo `.zip` a la PC cliente y descomprimelo en una ubicacion permanente (ej. `C:\\SoftlandUpdaterAgent`).</li>
+                            <li>Copia el archivo `.zip` a la PC cliente y descomprímelo en una ubicación permanente (ej. `C:\\ClicUpdaterAgent`).</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Ejecutar el Instalador:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                             <li>Navega hasta la carpeta donde descomprimiste los archivos.</li>
-                            <li>Haz **doble clic** en el archivo `install.bat`.</li>
-                            <li>Si aparece una ventana de Control de Cuentas de Usuario (UAC), haz clic en "Si" para permitir que el script se ejecute como Administrador.</li>
+                            <li>Haz **clic derecho** en el archivo `install.bat` y selecciona **"Ejecutar como administrador"**.</li>
                         </ul>
                     </li>
                     <li>
                         <strong>Ingresar la URL del Servidor:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
-                             <li>La consola te pedira que ingreses la URL base de este servidor. Ejemplo: `http://192.168.1.100:9002`.</li>
-                             <li>Esta URL se guarda en un archivo `config.json` local para que el agente sepa a donde comunicarse.</li>
+                             <li>La consola te pedirá que ingreses la URL base de este servidor. Ejemplo: `http://192.168.1.100:9002`.</li>
+                             <li>Esta URL se guarda en un archivo `config.json` local para que el agente sepa a dónde comunicarse.</li>
                         </ul>
                     </li>
                      <li>
                         <strong>Verificar la Instalación:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                              <li>
-                                Si todo sale bien, la consola mostrará un mensaje de "¡ÉXITO!". La ventana permanecerá abierta para que puedas leer el resultado.
+                                Si todo sale bien, la consola mostrará un mensaje de "¡ÉXITO!". La ventana permanecerá abierta hasta que presiones una tecla.
                              </li>
-                             <li>El nuevo servicio llamado `Softland Updater Agent` se habrá instalado y estará ejecutándose con la cuenta `Sistema Local`.</li>
+                             <li>El nuevo servicio llamado `Clic Actualizador Tools Agent` se habrá instalado y estará ejecutándose con la cuenta `Sistema Local`.</li>
                         </ul>
                     </li>
                 </ol>
@@ -329,12 +306,12 @@ export default function HelpPage() {
                     <AlertTitle>PASO MANUAL Y OBLIGATORIO: Configurar Credenciales de Red</AlertTitle>
                     <AlertDescription>
                        <div className="space-y-2">
-                        <p>Para que el agente pueda acceder a los archivos de actualización en la red, debes cambiar la cuenta con la que se ejecuta.</p>
+                        <p>Para que el agente pueda acceder a los archivos en carpetas compartidas de la red, debes cambiar la cuenta con la que se ejecuta.</p>
                         <ol className="list-decimal pl-5 space-y-1">
                             <li>Abre la consola de Servicios de Windows (`services.msc`).</li>
-                            <li>Busca el servicio <strong>"Softland Updater Agent"</strong> y abre sus propiedades.</li>
+                            <li>Busca el servicio <strong>"Clic Actualizador Tools Agent"</strong> y abre sus propiedades.</li>
                             <li>Ve a la pestaña <strong>"Iniciar sesión"</strong>.</li>
-                            <li>Selecciona "Esta cuenta" e ingresa las credenciales de un usuario de dominio que tenga permisos de lectura sobre la carpeta de red donde se encuentra el archivo de actualización.</li>
+                            <li>Selecciona "Esta cuenta" e ingresa las credenciales de un usuario de dominio que tenga permisos de lectura sobre las carpetas de red que usarás.</li>
                             <li>Guarda los cambios y reinicia el servicio.</li>
                         </ol>
                         <p>La nueva PC aparecerá automáticamente en el panel de control después de unos minutos.</p>
@@ -345,94 +322,19 @@ export default function HelpPage() {
         )
     },
     {
-        title: "Auto-Actualizacion del Agente y Logica de Funcionamiento",
-        icon: <Cog className="mr-4 h-6 w-6 text-orange-500" />,
+        title: "Descargar Instalador del Agente",
+        icon: <HardDriveDownload className="mr-4 h-6 w-6 text-slate-600" />,
         content: (
             <div className="space-y-4">
                 <p>
-                Para mantener el sistema de gestion eficiente, el propio agente tiene la capacidad de actualizarse a si mismo y sigue una logica de operacion clara.
+                Desde aquí puedes descargar el paquete de instalación genérico para el agente. Este mismo paquete `.zip` se utiliza para todas las PCs que desees registrar en el sistema.
                 </p>
-                <h4 className="font-semibold text-lg pt-2 border-t">Paso 1: Recoleccion de Datos y Comunicacion</h4>
-                 <ul className="list-disc space-y-3 pl-6">
-                    <li>
-                        El agente inicia y recolecta informacion clave: su propia version, el nombre del equipo (`hostname`), la IP actual, el usuario con sesion activa y un inventario basico de hardware.
-                    </li>
-                     <li>
-                        Envía toda esta informacion al servidor para solicitar instrucciones. Si es la primera vez que se conecta, el servidor lo registrara como una nueva PC usando su `hostname`.
-                    </li>
-                </ul>
-                 <h4 className="font-semibold text-lg pt-2 border-t">Paso 2: Recepcion y Priorizacion de Ordenes</h4>
-                 <ul className="list-disc space-y-3 pl-6">
-                    <li>
-                        El servidor analiza los datos y decide que hacer, siguiendo un orden de prioridad estricto:
-                         <ol className="list-decimal space-y-2 pl-5 mt-2">
-                             <li><strong>Auto-Actualizacion del Agente:</strong> Si la version del agente es antigua, el servidor ordena una auto-actualizacion. Esta es la maxima prioridad.</li>
-                             <li><strong>Cancelacion de Tarea:</strong> Si una tarea activa fue cancelada manualmente, el servidor ordena detenerla.</li>
-                             <li><strong>Actualizacion de Softland:</strong> Si hay una actualizacion de Softland pendiente, el servidor envia la orden.</li>
-                             <li><strong>Ninguna Tarea:</strong> Si no hay nada que hacer, el agente se pone en espera.</li>
-                         </ol>
-                    </li>
-                </ul>
-                <h4 className="font-semibold text-lg pt-2 border-t">Paso 3: Ejecucion de la Tarea</h4>
-                 <ul className="list-disc space-y-3 pl-6">
-                    <li>
-                        <strong>Si la orden es auto-actualizar:</strong> El agente antiguo descarga el nuevo paquete del instalador generico, ejecuta el nuevo instalador (que limpia versiones viejas) y luego se detiene. Este proceso es automatico y garantiza que los agentes se mantengan al dia sin intervencion manual.
-                    </li>
-                     <li>
-                        <strong>Si la orden es actualizar Softland:</strong> El agente ejecuta el proceso de actualizacion paso a paso, enviando logs al servidor sobre el progreso y resultado de cada etapa. Estos pasos incluyen el desbloqueo de archivos descargados para evitar problemas de seguridad de Windows y el registro automatico de componentes basado en el archivo `ERPReg.xml` que venga en la actualizacion.
-                    </li>
-                     <li>
-                        <strong>Si no hay tareas:</strong> El agente espera un intervalo de tiempo y vuelve a empezar el ciclo desde el Paso 1.
-                    </li>
-                </ul>
-                <Alert variant="default" className="mt-4">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>Proceso 100% Automatico</AlertTitle>
-                    <AlertDescription>
-                        No necesitas hacer nada para mantener los agentes actualizados. Si ves una version de agente en rojo en el panel, el sistema lo corregira automaticamente en el proximo ciclo de comunicacion.
-                    </AlertDescription>
-                </Alert>
-            </div>
-        )
-    },
-    {
-        title: "Guia del Historial y Solucion de Problemas",
-        icon: <History className="mr-4 h-6 w-6 text-purple-500" />,
-        content: (
-            <div className="space-y-4">
-                <p>
-                La pagina de Historial es tu mejor herramienta para entender que ha sucedido en el sistema y para diagnosticar problemas.
-                </p>
-                <h4 className="font-semibold text-lg pt-2 border-t">Interpretando los Registros</h4>
-                <ul className="list-disc space-y-3 pl-6">
-                    <li>
-                        <strong>Exito:</strong> La operacion se completo correctamente.
-                    </li>
-                     <li>
-                        <strong>Fallo:</strong> Ocurrio un error. El mensaje en el log te dara una pista crucial sobre que salio mal (ej. "Acceso denegado a C:\\SoftlandERP\\sl.dll", "No se pudo detener el servicio 'Servicio1'").
-                    </li>
-                     <li>
-                        <strong>Omitido:</strong> El agente determino que la actualizacion no era necesaria porque la PC ya tenia la ultima version.
-                    </li>
-                    <li>
-                        <strong>Cancelado:</strong> La tarea fue cancelada manualmente desde el panel de control antes de que pudiera completarse.
-                    </li>
-                </ul>
-                 <h4 className="font-semibold text-lg pt-2 border-t">¿Como Cancelar una Tarea en Progreso?</h4>
-                 <ol className="list-decimal space-y-2 pl-5 mt-2">
-                    <li>
-                        <strong>Iniciar la Tarea:</strong> Haz clic en "Actualizar Ahora". Aparecera una ventana emergente mostrando que la tarea esta en progreso.
-                    </li>
-                    <li>
-                        <strong>Localizar el Boton de Cancelar:</strong> Dentro de esa ventana emergente, veras un boton rojo que dice <span className="inline-flex items-center"><Button variant="destructive" size="sm" disabled><Ban className="mr-2 h-4 w-4" />Cancelar Tarea</Button></span>.
-                    </li>
-                    <li>
-                        <strong>Enviar la Orden de Cancelacion:</strong> Al hacer clic en ese boton, el panel envia una "señal de cancelacion" al servidor, que marca la tarea activa como `cancelado` en la base de datos.
-                    </li>
-                    <li>
-                        <strong>El Agente se Detiene:</strong> En su siguiente punto de control, el agente en la PC cliente vera que la tarea ha sido cancelada, detendra su proceso, y reportara el estado de "Cancelado" al panel.
-                    </li>
-                </ol>
+                <div className="flex justify-center pt-4">
+                    <Button onClick={() => window.location.href = '/api/download-agent'}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar Instalador del Agente (.zip)
+                    </Button>
+                </div>
             </div>
         )
     },
@@ -445,7 +347,7 @@ export default function HelpPage() {
                 <LifeBuoy className="w-10 h-10 text-primary" />
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Centro de Ayuda</h1>
-                    <p className="text-muted-foreground mt-1">Encuentre respuestas y tutoriales sobre como usar Softland Updater.</p>
+                    <p className="text-muted-foreground mt-1">Encuentre respuestas y tutoriales sobre cómo usar Clic Actualizador Tools.</p>
                 </div>
             </div>
         </header>
@@ -456,7 +358,7 @@ export default function HelpPage() {
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input 
-                            placeholder="Buscar en la documentacion..." 
+                            placeholder="Buscar en la documentación..." 
                             className="pl-10 text-base"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}

@@ -18,8 +18,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit, Trash2, Package as PackageIcon } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { MoreHorizontal, Edit, Trash2, Package as PackageIcon, FileCode, Terminal } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -33,11 +33,31 @@ import {
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from '../ui/button';
 import { useRouter } from 'next/navigation';
+import { Badge } from '../ui/badge';
 
 
 interface PackageListProps {
   packages: Package[];
 }
+
+const packageTypeDetails = {
+    actualizacion_archivos: {
+        label: "Actualización de Archivos",
+        icon: FileCode,
+        variant: "secondary"
+    },
+    ejecutar_script: {
+        label: "Script",
+        icon: FileCode,
+        variant: "default"
+    },
+    comando_powershell: {
+        label: "Comando PS",
+        icon: Terminal,
+        variant: "outline"
+    },
+} as const;
+
 
 export function PackageList({ packages: initialPackages }: PackageListProps) {
     const router = useRouter();
@@ -83,6 +103,7 @@ export function PackageList({ packages: initialPackages }: PackageListProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Catálogo de Software</CardTitle>
+                    <CardDescription>Paquetes de instalación, actualización y comandos disponibles para despliegue.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="border rounded-md">
@@ -90,17 +111,24 @@ export function PackageList({ packages: initialPackages }: PackageListProps) {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Nombre</TableHead>
+                                    <TableHead>Tipo</TableHead>
                                     <TableHead>Descripción</TableHead>
-                                    <TableHead>Ruta del Archivo</TableHead>
                                     <TableHead className="text-right">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {packages.map((pkg) => (
+                                {packages.map((pkg) => {
+                                  const details = packageTypeDetails[pkg.packageType] || packageTypeDetails.actualizacion_archivos;
+                                  return (
                                     <TableRow key={pkg.id}>
                                         <TableCell className="font-medium">{pkg.name}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={details.variant as any}>
+                                                <details.icon className="mr-2 h-4 w-4" />
+                                                {details.label}
+                                            </Badge>
+                                        </TableCell>
                                         <TableCell className="text-muted-foreground max-w-sm truncate">{pkg.description}</TableCell>
-                                        <TableCell className="text-muted-foreground font-mono text-xs">{pkg.updateFilePath}</TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -123,7 +151,8 @@ export function PackageList({ packages: initialPackages }: PackageListProps) {
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                  )
+                                })}
                             </TableBody>
                         </Table>
                     </div>

@@ -1,55 +1,57 @@
 @echo off
 setlocal
 
-:: ============================================================================
-:: Script de Instalacion del Agente de Softland Updater
-:: ============================================================================
+:: =================================================================
+:: Instalador del Servicio del Agente de Clic Actualizador Tools
+:: =================================================================
 
-:: Configuración
-set "SERVICE_NAME=SoftlandUpdaterAgent"
-set "SCRIPT_DIR=%~dp0"
-set "POWERSHELL_SCRIPT=%SCRIPT_DIR%install-service.ps1"
+:: Solicita privilegios de administrador si no los tiene
+>nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
+if '%errorlevel%' NEQ '0' (
+    echo Solicitando privilegios de administrador...
+    goto UACPrompt
+) else ( goto gotAdmin )
 
-:: Encabezado
-echo.
-echo =============================================================
-echo    Instalador del Agente de Softland Updater
-echo =============================================================
+:UACPrompt
+    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    set params= %*
+    echo UAC.ShellExecute "cmd.exe", "/c ""%~s0"" %params%", "", "runas", 1 >> "%temp%\getadmin.vbs"
+    "%temp%\getadmin.vbs"
+    del "%temp%\getadmin.vbs"
+    exit /B
+
+:gotAdmin
+pushd "%CD%"
+CD /D "%~dp0"
+
+cls
+echo =======================================================================
+echo          Instalador del Agente de Clic Actualizador Tools
+echo =======================================================================
 echo.
 echo Este script instalara el agente como un servicio de Windows.
 echo.
 
-:run_powershell
+:: Ejecuta el script de PowerShell
 echo Ejecutando el script de configuracion de PowerShell...
-echo.
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File ".\install-service.ps1"
 
-:: Ejecutar el script de PowerShell sin restricciones y capturar la salida
-powershell -NoProfile -ExecutionPolicy Bypass -File "%POWERSHELL_SCRIPT%" -ServiceName "%SERVICE_NAME%"
-set "ps_errorlevel=%errorlevel%"
-
-echo.
-echo ------------------------------------------------------
-
-:: Verificar si PowerShell reportó un error (errorlevel no es 0)
-if %ps_errorlevel% neq 0 (
+:: Revisa si PowerShell devolvio un error
+if %ERRORLEVEL% neq 0 (
     echo.
+    echo ------------------------------------------------------
     echo  LA INSTALACION FALLO.
     echo  Revisa el mensaje de error de arriba para mas detalles.
-    echo.
+    echo ------------------------------------------------------
 ) else (
     echo.
-    echo  INSTALACION COMPLETADA CON EXITO.
-    echo.
-    echo  --> SIGUIENTE PASO IMPORTANTE:
-    echo.
-    echo  1. Abra la consola de Servicios (services.msc).
-    echo  2. Busque el servicio "Softland Updater Agent".
-    echo  3. En Propiedades > Iniciar sesion, cambie la cuenta a un
-    echo     usuario de dominio con acceso a la red.
-    echo.
+    echo ------------------------------------------------------
+    echo  INSTALACION COMPLETADA.
+    echo  El servicio "Clic Actualizador Tools Agent" esta corriendo.
+    echo  (Puedes cerrar esta ventana)
+    echo ------------------------------------------------------
 )
 
-echo ------------------------------------------------------
 echo.
 pause
-exit /b
+exit

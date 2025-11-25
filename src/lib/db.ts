@@ -38,17 +38,19 @@ function runMigrations() {
           );
         `);
 
-        // Tabla para almacenar los paquetes de software
+        // Tabla para almacenar los paquetes de software (AHORA CON TIPOS)
         db.exec(`
             CREATE TABLE IF NOT EXISTS packages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 description TEXT,
-                updateFilePath TEXT NOT NULL,
-                localUpdateDir TEXT NOT NULL,
-                installDir TEXT NOT NULL,
+                packageType TEXT NOT NULL,
+                updateFilePath TEXT,
+                localUpdateDir TEXT,
+                installDir TEXT,
                 serviceName TEXT,
-                environmentPath TEXT
+                environmentPath TEXT,
+                command TEXT
             );
         `);
 

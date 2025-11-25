@@ -35,7 +35,7 @@ export function MainSidebar() {
         <div className="flex items-center gap-3 p-4">
           <Rocket className="h-8 w-8 text-sidebar-foreground" />
           <h1 className="text-xl font-semibold text-sidebar-foreground whitespace-nowrap">
-            Softland Updater
+            Clic Actualizador
           </h1>
         </div>
       </SidebarHeader>

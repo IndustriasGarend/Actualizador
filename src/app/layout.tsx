@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Softland Auto Updater',
-  description: 'Panel de administración para actualizaciones de Softland.',
+  title: 'Clic Actualizador Tools',
+  description: 'Panel de administración para despliegue de software y actualizaciones.',
 };
 
 export default function RootLayout({

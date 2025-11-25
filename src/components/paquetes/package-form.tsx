@@ -16,22 +16,53 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import type { Package } from '@/lib/types';
+import type { Package, PackageType } from '@/lib/types';
 import { Loader2, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const formSchema = z.object({
-  name: z.string().min(1, 'El nombre del paquete es requerido.'),
+  name: z.string().min(1, 'El nombre es requerido.'),
   description: z.string().optional(),
-  updateFilePath: z.string().min(1, 'La ruta del archivo es requerida.'),
-  localUpdateDir: z.string().min(1, 'El directorio local es requerido.'),
-  installDir: z.string().min(1, 'El directorio de instalación es requerido.'),
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell'], {
+    required_error: "Debe seleccionar un tipo de paquete.",
+  }),
+  // Campos condicionales
+  updateFilePath: z.string().optional(),
+  localUpdateDir: z.string().optional(),
+  installDir: z.string().optional(),
   serviceName: z.string().optional(),
   environmentPath: z.string().optional(),
+  command: z.string().optional(),
+}).refine(data => {
+    if (data.packageType === 'actualizacion_archivos') {
+        return !!data.updateFilePath && !!data.installDir;
+    }
+    return true;
+}, {
+    message: 'La ruta del archivo y el directorio de instalación son requeridos para este tipo de paquete.',
+    path: ['installDir'],
+}).refine(data => {
+    if (data.packageType === 'ejecutar_script') {
+        return !!data.updateFilePath;
+    }
+    return true;
+}, {
+    message: 'La ruta del script es requerida.',
+    path: ['updateFilePath'],
+}).refine(data => {
+    if (data.packageType === 'comando_powershell') {
+        return !!data.command;
+    }
+    return true;
+}, {
+    message: 'El comando es requerido.',
+    path: ['command'],
 });
+
 
 interface PackageFormProps {
   initialPackage?: Package;
@@ -61,13 +92,17 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
     defaultValues: {
         name: initialPackage?.name || '',
         description: initialPackage?.description || '',
+        packageType: initialPackage?.packageType || undefined,
         updateFilePath: initialPackage?.updateFilePath || '',
         localUpdateDir: initialPackage?.localUpdateDir || 'C:\\Temp\\Update',
         installDir: initialPackage?.installDir || '',
         serviceName: initialPackage?.serviceName || '',
         environmentPath: initialPackage?.environmentPath || '',
+        command: initialPackage?.command || '',
     },
   });
+
+  const packageType = form.watch('packageType');
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSaving(true);
@@ -111,23 +146,47 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
         <Card className="max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle>Información del Paquete</CardTitle>
-            <CardDescription>Estos valores definirán cómo se despliega este paquete de software.</CardDescription>
+            <CardDescription>Defina un nuevo paquete de software, actualización o comando para su catálogo.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre del Paquete</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Actualización Softland Verano 2024" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-            />
-            <FormField
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Nombre del Paquete</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Ej: Actualización Verano 2024" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="packageType"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Tipo de Paquete</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione un tipo de ejecución" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="actualizacion_archivos">Actualización de Archivos (copiar y pegar)</SelectItem>
+                                    <SelectItem value="ejecutar_script">Ejecutar Script (.bat, .ps1)</SelectItem>
+                                    <SelectItem value="comando_powershell">Comando PowerShell (ej. winget)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                 />
+            </div>
+             <FormField
                 control={form.control}
                 name="description"
                 render={({ field }) => (
@@ -140,108 +199,87 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
                   </FormItem>
                 )}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-              <FormField
-                control={form.control}
-                name="updateFilePath"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center">
-                        Ruta de archivo de actualización
-                        <HelpTooltip>
-                            Ruta de red completa (UNC Path) al archivo comprimido (.7z, .zip, etc.) que contiene el software. La cuenta de servicio del agente debe tener permisos de lectura.
-                        </HelpTooltip>
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="\\\\servidor\\updates\\update.7z" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="localUpdateDir"
-                render={({ field }) => (
-                  <FormItem>
-                     <FormLabel className="flex items-center">
-                        Directorio de actualización local
-                        <HelpTooltip>
-                            Carpeta temporal en la PC cliente donde se extraerán los archivos antes de copiarlos a su destino final.
-                        </HelpTooltip>
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="C:\\Temp\\Update" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="installDir"
-                render={({ field }) => (
-                  <FormItem>
-                     <FormLabel className="flex items-center">
-                        Directorio de instalación/destino
-                        <HelpTooltip>
-                            Ruta local en la PC cliente donde se copiarán los archivos. Es la carpeta donde se sobrescribirán los archivos existentes.
-                        </HelpTooltip>
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="C:\\SoftlandERP" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="serviceName"
-                render={({ field }) => (
-                  <FormItem>
-                     <FormLabel className="flex items-center">
-                        Nombres de los servicios
-                        <HelpTooltip>
-                            (Opcional) Lista de servicios de Windows que deben ser detenidos antes de la actualización para liberar archivos. Si son varios, sepáralos por comas.
-                        </HelpTooltip>
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="Servicio1,Servicio POS" {...field} />
-                    </FormControl>
-                    <FormDescription>Servicios a detener, separados por comas.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="space-y-4 pt-4 border-t">
-              <FormField
-                  control={form.control}
-                  name="environmentPath"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center">
-                          Rutas adicionales para variable de entorno PATH
-                          <HelpTooltip>
-                              (Opcional) Pegue aquí las rutas que desea añadir a la variable de entorno PATH del sistema en las PCs cliente. Separe cada ruta con un punto y coma (;). El agente no añade rutas duplicadas.
-                          </HelpTooltip>
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="C:\\Ruta1;C:\\Ruta2\\SubRuta" className="min-h-[100px] font-mono text-xs" {...field} />
-                      </FormControl>
-                      <FormDescription>Rutas a añadir al PATH, separadas por punto y coma.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
+            {/* CAMPOS CONDICIONALES */}
+            <div className="space-y-6 pt-4 border-t">
+
+            {packageType === 'actualizacion_archivos' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <h3 className="text-lg font-medium text-primary">Parámetros de Actualización de Archivos</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField control={form.control} name="updateFilePath" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center">Ruta de archivo comprimido<HelpTooltip>Ruta de red (UNC) al archivo .zip o .7z.</HelpTooltip></FormLabel>
+                                <FormControl><Input placeholder="\\\\servidor\\updates\\update.7z" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="installDir" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center">Directorio de instalación/destino<HelpTooltip>Carpeta en la PC cliente donde se copiarán los archivos.</HelpTooltip></FormLabel>
+                                <FormControl><Input placeholder="C:\\SoftlandERP" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="localUpdateDir" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center">Directorio de actualización local<HelpTooltip>Carpeta temporal en la PC cliente para extraer archivos.</HelpTooltip></FormLabel>
+                                <FormControl><Input placeholder="C:\\Temp\\Update" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="serviceName" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center">Nombres de servicios a detener<HelpTooltip>(Opcional) Lista de servicios de Windows a detener, separados por comas.</HelpTooltip></FormLabel>
+                                <FormControl><Input placeholder="Servicio1,Servicio POS" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                    </div>
+                     <FormField control={form.control} name="environmentPath" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center">Rutas para variable de entorno PATH<HelpTooltip>(Opcional) Rutas a añadir al PATH del sistema, separadas por punto y coma (;).</HelpTooltip></FormLabel>
+                            <FormControl><Textarea placeholder="C:\\Ruta1;C:\\Ruta2" className="min-h-[100px] font-mono text-xs" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+            )}
+
+            {packageType === 'ejecutar_script' && (
+                 <div className="space-y-6 animate-in fade-in">
+                    <h3 className="text-lg font-medium text-primary">Parámetros de Ejecución de Script</h3>
+                    <FormField control={form.control} name="updateFilePath" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center">Ruta de red del script<HelpTooltip>Ruta de red completa (UNC) al archivo .bat o .ps1 que se ejecutará en la PC cliente.</HelpTooltip></FormLabel>
+                            <FormControl><Input placeholder="\\\\servidor\\scripts\\instalar_programa.bat" {...field} /></FormControl>
+                            <FormDescription>El agente descargará y ejecutará este script.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                 </div>
+            )}
+
+            {packageType === 'comando_powershell' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <h3 className="text-lg font-medium text-primary">Parámetros de Comando PowerShell</h3>
+                    <FormField control={form.control} name="command" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center">Comando a ejecutar<HelpTooltip>El comando exacto que se ejecutará en una terminal de PowerShell en la PC cliente.</HelpTooltip></FormLabel>
+                            <FormControl><Textarea placeholder="winget upgrade --all --accept-package-agreements" className="min-h-[120px] font-mono text-sm" {...field} /></FormControl>
+                             <FormDescription>Ejemplos: `winget install Google.Chrome`, `gpupdate /force`.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+            )}
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-4">
               <Button type="button" variant="outline" onClick={() => router.back()}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving || !packageType}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Guardar Paquete
               </Button>

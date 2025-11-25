@@ -51,16 +51,11 @@ export async function POST(
         return NextResponse.json({ task: 'ninguna' });
       }
 
+      // Devolver toda la información del paquete en el objeto de configuración
       return NextResponse.json({ 
         task: 'actualizar', 
         taskId: task.id,
-        config: {
-          updateFilePath: pkg.updateFilePath,
-          localUpdateDir: pkg.localUpdateDir,
-          softlandInstallDir: pkg.installDir,
-          serviceName: pkg.serviceName,
-          environmentPath: pkg.environmentPath,
-        }
+        config: pkg // pkg contiene todos los campos necesarios
       });
     }
 

@@ -39,13 +39,20 @@ export interface LogEntry {
   versionId?: string | null;
 }
 
+export type PackageType = 'actualizacion_archivos' | 'ejecutar_script' | 'comando_powershell';
+
 export interface Package {
   id: number;
   name: string;
   description: string | null;
-  updateFilePath: string;
-  localUpdateDir: string;
-  installDir: string;
-  serviceName: string;
+  packageType: PackageType;
+  // Campos para actualizacion_archivos y ejecutar_script
+  updateFilePath: string | null; 
+  // Campos para actualizacion_archivos
+  localUpdateDir: string | null;
+  installDir: string | null;
+  serviceName: string | null;
   environmentPath: string | null;
+  // Campo para comando_powershell
+  command: string | null;
 }

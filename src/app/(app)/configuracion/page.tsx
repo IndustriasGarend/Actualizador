@@ -1,5 +1,5 @@
-// This page is obsolete and will be removed.
-// Redirecting to the new packages page.
+// Esta página es obsoleta y se ha reemplazado por la gestión de paquetes.
+// Redireccionando a la nueva página.
 import { redirect } from 'next/navigation';
 
 export default function OldConfiguracionPage() {

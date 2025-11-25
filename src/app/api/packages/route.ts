@@ -5,11 +5,13 @@ import { z } from 'zod';
 const packageSchema = z.object({
   name: z.string().min(1, 'El nombre del paquete es requerido.'),
   description: z.string().optional(),
-  updateFilePath: z.string().min(1, 'La ruta del archivo es requerida.'),
-  localUpdateDir: z.string().min(1, 'El directorio local es requerido.'),
-  installDir: z.string().min(1, 'El directorio de instalación es requerido.'),
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell']),
+  updateFilePath: z.string().optional(),
+  localUpdateDir: z.string().optional(),
+  installDir: z.string().optional(),
   serviceName: z.string().optional(),
   environmentPath: z.string().optional(),
+  command: z.string().optional(),
 });
 
 export async function GET() {
@@ -32,12 +34,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Datos de paquete inválidos', errors: validatedBody.error.flatten() }, { status: 400 });
     }
     
-    const { name, description, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath } = validatedBody.data;
+    const { name, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command } = validatedBody.data;
 
     const stmt = db.prepare(
-      'INSERT INTO packages (name, description, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      `INSERT INTO packages (
+        name, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    const result = stmt.run(name, description || null, updateFilePath, localUpdateDir, installDir, serviceName || '', environmentPath || '');
+    const result = stmt.run(
+        name, 
+        description || null, 
+        packageType,
+        updateFilePath || null, 
+        localUpdateDir || null, 
+        installDir || null, 
+        serviceName || null, 
+        environmentPath || null,
+        command || null
+    );
 
     return NextResponse.json({ message: 'Paquete creado correctamente', packageId: result.lastInsertRowid });
 

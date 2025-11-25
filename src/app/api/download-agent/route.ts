@@ -35,22 +35,22 @@ export async function GET(request: Request) {
         zip.file('7za.exe', sevenZipBuffer, { binary: true });
 
         const readmeContent = `
-Paquete de Agente Generico para Softland Updater
+Paquete de Agente para Clic Actualizador Tools
 =================================================
 
 Instrucciones de Instalacion:
 -----------------------------
 
-1. Copie esta carpeta a una ubicacion permanente en la PC cliente (ej: C:\\SoftlandAgent).
-2. Haga doble clic en el archivo 'install.bat'.
+1. Copie esta carpeta a una ubicacion permanente en la PC cliente (ej: C:\\ClicUpdaterAgent).
+2. Haga clic derecho en 'install.bat' y seleccione 'Ejecutar como administrador'.
 3. Acepte la solicitud de permisos de Administrador (UAC).
-4. La consola le pedira la URL del servidor. Ingrese la direccion completa, incluyendo el puerto (ej: http://192.168.1.100:9002).
-5. A continuacion, se le pediran las credenciales de la cuenta de servicio para ejecutar el agente.
-6. El script instalara y arrancara el servicio. La PC se registrara automaticamente en el panel de control.
+4. La consola le pedira la URL del servidor. Ingrese la direccion completa (ej: http://192.168.1.100:9002).
+5. El script instalara y arrancara el servicio 'Clic Actualizador Tools Agent'.
+6. (OBLIGATORIO) Vaya a services.msc, busque el servicio, y en Propiedades > Iniciar sesion, configure una cuenta con acceso a la red.
 `;
         zip.file('LEEME.txt', readmeContent);
 
-        const zipFilename = `softland-agent-installer.zip`;
+        const zipFilename = `clic-actualizador-agent-installer.zip`;
         const zipContent = await zip.generateAsync({ type: 'nodebuffer', platform: 'DOS' });
 
         // Devolver el ZIP para descarga

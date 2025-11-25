@@ -5,11 +5,13 @@ import { z } from 'zod';
 const packageSchema = z.object({
   name: z.string().min(1, 'El nombre del paquete es requerido.'),
   description: z.string().optional(),
-  updateFilePath: z.string().min(1, 'La ruta del archivo es requerida.'),
-  localUpdateDir: z.string().min(1, 'El directorio local es requerido.'),
-  installDir: z.string().min(1, 'El directorio de instalación es requerido.'),
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell']),
+  updateFilePath: z.string().optional(),
+  localUpdateDir: z.string().optional(),
+  installDir: z.string().optional(),
   serviceName: z.string().optional(),
   environmentPath: z.string().optional(),
+  command: z.string().optional(),
 });
 
 export async function GET(
@@ -51,20 +53,33 @@ export async function PUT(
       return NextResponse.json({ message: 'Datos de paquete inválidos', errors: validatedBody.error.flatten() }, { status: 400 });
     }
     
-    const { name, description, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath } = validatedBody.data;
+    const { name, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command } = validatedBody.data;
     
     const stmt = db.prepare(
         `UPDATE packages SET 
             name = ?, 
             description = ?, 
+            packageType = ?,
             updateFilePath = ?, 
             localUpdateDir = ?, 
             installDir = ?, 
             serviceName = ?, 
-            environmentPath = ? 
+            environmentPath = ?,
+            command = ?
         WHERE id = ?`
     );
-    const result = stmt.run(name, description || null, updateFilePath, localUpdateDir, installDir, serviceName || '', environmentPath || '', id);
+    const result = stmt.run(
+        name, 
+        description || null, 
+        packageType,
+        updateFilePath || null, 
+        localUpdateDir || null, 
+        installDir || null, 
+        serviceName || null, 
+        environmentPath || null, 
+        command || null,
+        id
+    );
 
     if (result.changes === 0) {
       return NextResponse.json({ message: 'El paquete no se encontró' }, { status: 404 });
