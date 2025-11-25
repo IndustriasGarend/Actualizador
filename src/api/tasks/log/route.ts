@@ -79,14 +79,15 @@ export async function POST(request: Request) {
         pcStmt.run(...params);
     }
 
-    // 4. Actualizar el estado de la tarea si corresponde
-    if(taskId && pcFinalStatus) { // Solo actualizamos si la tarea tiene un estado final
+    // 4. Actualizar el estado de la tarea si corresponde (SOLO si hay taskId y la tarea tiene estado final)
+    if(taskId && pcFinalStatus) {
         let taskStatus: string;
         switch(pcFinalStatus) {
             case 'Actualizado': taskStatus = 'completado'; break;
             case 'Error': taskStatus = 'error'; break;
+
             case 'Cancelado': taskStatus = 'cancelado'; break;
-            default: taskStatus = 'en_progreso'; break;
+            default: taskStatus = 'en_progreso'; break; // No debería ocurrir, pero como fallback
         }
         
         if (taskStatus !== 'en_progreso') {
