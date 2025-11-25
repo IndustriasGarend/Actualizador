@@ -1,63 +1,86 @@
-# ============================================================================
-# Script de PowerShell para Instalar/Actualizar el Servicio del Agente
-# ============================================================================
+#Requires -RunAsAdministrator
+
+[CmdletBinding(SupportsShouldProcess = $true)]
+param()
+
 $serviceName = "ClicActualizadorToolsAgent"
 $serviceDisplayName = "Clic Actualizador Tools Agent"
-$serviceDescription = "Agente de despliegue y actualizacion para Clic Actualizador Tools."
-$scriptPath = (Get-Item -Path ".\").FullName + "\agent.ps1"
+$serviceDescription = "Agente de Clic Actualizador Tools que se comunica con el servidor central para ejecutar tareas de despliegue."
 
-# Funcion para escribir mensajes de error y salir
-function Write-ErrorAndExit($message) {
-    Write-Host ">>> ¡ERROR!" -ForegroundColor Red
-    Write-Host "Ocurrió un error durante la instalación:" -ForegroundColor Yellow
-    Write-Host $message -ForegroundColor Red
-    # Pausa para que el usuario pueda leer el error, luego sale
-    # El script .bat manejara el PAUSE final
-    exit 1
+# La ruta al ejecutable del agente será la carpeta donde se encuentra este script.
+$scriptPath = $PSScriptRoot
+$agentExecutable = Join-Path -Path $scriptPath -ChildPath "agent.ps1"
+
+# Comando que ejecutará el servicio.
+# Se usa -ExecutionPolicy Bypass para asegurar que el script se ejecute sin problemas
+# incluso en sistemas con políticas de ejecución restrictivas.
+$serviceCommand = "powershell.exe -ExecutionPolicy Bypass -NoProfile -NoLogo -NonInteractive -File `"$agentExecutable`""
+
+function Check-ServiceExists {
+    param([string]$name)
+    return Get-Service -Name $name -ErrorAction SilentlyContinue
 }
 
-# --- INICIO DEL PROCESO ---
+# -----------------
+# --- MAIN FLOW ---
+# -----------------
 try {
-    # Paso 1: Buscar y detener/eliminar el servicio si ya existe
-    Write-Host ""
-    Write-Host "Buscando versiones anteriores del servicio..." -ForegroundColor Cyan
-    $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($existingService) {
-        Write-Host "Se encontró un servicio existente. Deteniendo y eliminándolo..." -ForegroundColor Yellow
+    # --- 1. Limpieza de Versiones Anteriores ---
+    Write-Host "Buscando versiones anteriores del servicio..." -ForegroundColor Yellow
+    if (Check-ServiceExists -name $serviceName) {
+        Write-Host "Se encontró un servicio existente. Deteniendo y eliminándolo..."
         Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
         
-        # El cmdlet Remove-Service no es estandar. Usamos sc.exe que es universal.
-        sc.exe delete $serviceName
+        # sc.exe delete es más robusto y universal que Remove-Service
+        sc.exe delete $serviceName | Out-Null
         
-        # Pequeña pausa para asegurar que el servicio se elimina completamente
-        Start-Sleep -Seconds 5
+        Write-Host "Servicio anterior eliminado." -ForegroundColor Green
+        Start-Sleep -Seconds 2 # Esperar un momento para que el SCM procese la eliminación
     } else {
-        Write-Host "No se encontraron servicios anteriores." -ForegroundColor Green
+        Write-Host "No se encontraron servicios anteriores."
     }
-    
-    # Paso 2: Pedir la URL del servidor y crear config.json
-    $configFilePath = (Get-Item -Path ".\").FullName + "\config.json"
+
+    # --- 2. Pedir URL del Servidor ---
+    $configFile = Join-Path -Path $scriptPath -ChildPath "config.json"
     $serverUrl = Read-Host "`n--> Por favor, ingresa la URL del servidor (ej. http://192.168.1.100:9002)"
-    $configJson = @{ serverUrl = $serverUrl } | ConvertTo-Json
-    Set-Content -Path $configFilePath -Value $configJson
+    $configContent = @{ serverUrl = $serverUrl } | ConvertTo-Json
+    
+    # Crear archivo de configuración con codificación UTF-8 sin BOM
+    $utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($configFile, $configContent, $utf8NoBomEncoding)
+
     Write-Host "Archivo de configuracion 'config.json' creado." -ForegroundColor Green
 
-    # Paso 3: Crear el nuevo servicio para ejecutarse como LocalSystem
-    Write-Host "`nCreando el nuevo servicio '$serviceName'..." -ForegroundColor Cyan
-    New-Service -Name $serviceName -BinaryPathName "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -DisplayName $serviceDisplayName -Description $serviceDescription -StartupType Automatic
-    
-    # Paso 4: Iniciar el servicio
-    Write-Host "Servicio creado. Iniciando el servicio..." -ForegroundColor Cyan
+    # --- 3. Crear el nuevo servicio ---
+    Write-Host "`nCreando el nuevo servicio '$serviceName'..." -ForegroundColor Yellow
+    New-Service -Name $serviceName `
+                -BinaryPathName $serviceCommand `
+                -DisplayName $serviceDisplayName `
+                -Description $serviceDescription `
+                -StartupType Automatic `
+                -Credential "LocalSystem"
+
+    Write-Host (Get-Service -Name $serviceName | Format-Table -AutoSize | Out-String)
+    Write-Host "Servicio creado. Iniciando el servicio..."
+
+    # --- 4. Iniciar el servicio ---
     Start-Service -Name $serviceName
     
-    # Mensaje final de exito
+    # --- 5. Mensaje de Éxito (solo si todo lo anterior funcionó) ---
     Write-Host "`n>>> ¡ÉXITO! El servicio del Agente se instaló e inició correctamente." -ForegroundColor Green
-    Write-Host "Ahora debes configurar la cuenta de red para el servicio." -ForegroundColor Yellow
+    Write-Host "Ahora debes configurar la cuenta de red para el servicio."
     Write-Host "1. Abre 'services.msc'."
     Write-Host "2. Busca el servicio '$serviceDisplayName'."
     Write-Host "3. En Propiedades > 'Iniciar sesión', cambia a 'Esta cuenta' y pon las credenciales de un usuario con acceso a la red."
-    Write-host "4. Reinicia el servicio."
+    Write-Host "4. Reinicia el servicio."
 
-} catch {
-    Write-ErrorAndExit $_.Exception.Message
+}
+catch {
+    # --- Manejo de Errores ---
+    Write-Host "`n>>> ¡ERROR!" -ForegroundColor Red
+    Write-Host "Ocurrió un error durante la instalación:" -ForegroundColor Red
+    Write-Host ($_.Exception.Message) -ForegroundColor Red
+    
+    # Salir con un código de error para que el .bat lo detecte
+    exit 1
 }
