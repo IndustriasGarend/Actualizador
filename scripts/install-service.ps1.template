@@ -1,105 +1,131 @@
-# Clic Actualizador Tools - Script de Instalación del Servicio
-# Versión: {{AGENT_VERSION}}
+# Titulo: Instalador del Servicio de Agente Clic Actualizador Tools
+# Descripcion: Instala el agente de PowerShell como un servicio de Windows usando NSSM.
 
-# --- Configuración ---
+# --- CONFIGURACION ---
 $serviceName = "ClicActualizadorToolsAgent"
 $serviceDisplayName = "Clic Actualizador Tools Agent"
-$serviceDescription = "Agente que recibe y ejecuta tareas de actualización desde el panel de Clic Actualizador Tools."
-$scriptPath = Join-Path $PSScriptRoot "agent.ps1"
+$serviceDescription = "Agente para el sistema Clic Actualizador Tools. Se comunica con el servidor para ejecutar tareas de despliegue."
 
-# --- Funciones de Utilidad ---
-function Show-Header {
-    Clear-Host
-    Write-Host "==========================================================" -ForegroundColor Cyan
-    Write-Host "  Instalador del Agente de Clic Actualizador Tools" -ForegroundColor White
-    Write-Host "==========================================================" -ForegroundColor Cyan
-    Write-Host
+# --- LOGICA ---
+
+# 1. Obtener la ruta del script y verificar permisos
+$scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Path
+Push-Location -Path $scriptPath
+
+function Test-Admin {
+    $currentUser = New-Object Security.Principal.WindowsPrincipal $(New-Object Security.Principal.WindowsIdentity).GetCurrent()
+    return $currentUser.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Pause-And-Exit {
-    param($message)
-    Write-Host
-    Write-Host "------------------------------------------------------" -ForegroundColor Gray
-    Write-Host " INSTALACION COMPLETADA." -ForegroundColor Green
-    Write-Host " (Puedes cerrar esta ventana)" -ForegroundColor Gray
-    Write-Host "------------------------------------------------------" -ForegroundColor Gray
-    Read-Host "Presiona Enter para cerrar esta ventana..."
-    exit
+if (-not (Test-Admin)) {
+    Write-Error "¡Acceso denegado! Por favor, ejecuta este script como Administrador (clic derecho > Ejecutar con PowerShell)."
+    Read-Host "Presiona Enter para salir..."
+    exit 1
 }
-
-# --- Lógica Principal ---
-Show-Header
-
-# 1. Verificar permisos de Administrador
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host ">>> ¡ERROR! Por favor, ejecuta este script como Administrador." -ForegroundColor Red
-    Write-Host "Haz clic derecho en 'install-service.ps1' y selecciona 'Ejecutar con PowerShell'." -ForegroundColor Yellow
-    Pause-And-Exit
-}
-
 Write-Host "Permisos de Administrador verificados." -ForegroundColor Green
-Write-Host
 
-# 2. Verificar si el servicio ya existe
+# 2. Verificar y manejar servicio existente
 $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-if ($service) {
-    Write-Host "El servicio '$serviceDisplayName' ya existe. Deteniendo e intentando reinstalar..." -ForegroundColor Yellow
+if ($null -ne $service) {
+    Write-Host ""
+    Write-Host "El servicio '$serviceName' ya existe. Intentando detener y eliminar para reinstalación..." -ForegroundColor Yellow
+    
     try {
-        Stop-Service -Name $serviceName -Force -ErrorAction Stop
-        $service | Remove-Service -ErrorAction Stop
+        if ($service.Status -ne 'Stopped') {
+            Stop-Service -Name $serviceName -Force -ErrorAction Stop
+            $service.WaitForStatus('Stopped', [System.TimeSpan]::FromSeconds(30))
+            Write-Host "Servicio detenido correctamente." -ForegroundColor Green
+        }
+
+        # Usar sc.exe delete para una eliminación más fiable
+        sc.exe delete "$serviceName" | Out-Null
+        
+        # Esperar a que el servicio se elimine del registro de servicios
+        Start-Sleep -Seconds 5
+
+        # Verificar que el servicio fue eliminado
+        $serviceCheck = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+        if ($null -ne $serviceCheck) {
+            throw "No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente (services.msc o 'sc delete $serviceName') y vuelve a intentarlo."
+        }
         Write-Host "Servicio anterior eliminado correctamente." -ForegroundColor Green
+
+    } catch {
+        Write-Error "¡ERROR! $_"
+        Write-Host ""
+        Write-Host "------------------------------------------------------" -ForegroundColor Red
+        Write-Host " INSTALACION FALLIDA." -ForegroundColor Red
+        Write-Host "------------------------------------------------------" -ForegroundColor Red
+        Read-Host "Presiona Enter para cerrar esta ventana..."
+        exit 1
     }
-    catch {
-        Write-Host ">>> ¡ERROR! No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente desde 'services.msc'." -ForegroundColor Red
-        Pause-And-Exit
-    }
-    Write-Host
 }
 
-# 3. Crear el nuevo servicio
-Write-Host "Creando el servicio..." -ForegroundColor White
-try {
-    New-Service -Name $serviceName -BinaryPathName "powershell.exe -ExecutionPolicy Bypass -File `"$scriptPath`"" -DisplayName $serviceDisplayName -Description $serviceDescription -StartupType Automatic -ErrorAction Stop
-    Write-Host "Servicio '$serviceDisplayName' creado correctamente." -ForegroundColor Green
-    Write-Host
-}
-catch {
-    Write-Host ">>> ¡ERROR! No se pudo crear el servicio: $($_.Exception.Message)" -ForegroundColor Red
-    Pause-And-Exit
+
+# 3. Instalación del servicio con NSSM
+$nssmPath = Join-Path $scriptPath "nssm.exe"
+if (-not (Test-Path $nssmPath)) {
+    Write-Error "No se encontró 'nssm.exe' en la carpeta del script. La instalación no puede continuar."
+    Read-Host "Presiona Enter para salir..."
+    exit 1
 }
 
-# 4. Iniciar el servicio y verificar estado
-Write-Host "Iniciando el servicio..." -ForegroundColor White
+$agentScriptPath = Join-Path $scriptPath "agent.ps1"
+if (-not (Test-Path $agentScriptPath)) {
+    Write-Error "No se encontró el script 'agent.ps1' en la carpeta. La instalación no puede continuar."
+    Read-Host "Presiona Enter para salir..."
+    exit 1
+}
+
 try {
-    Start-Service -Name $serviceName -ErrorAction Stop
-    Write-Host
-    $finalServiceState = Get-Service -Name $serviceName
-    if ($finalServiceState.Status -eq "Running") {
-         Write-Host ">>> ¡ÉXITO! El servicio se instaló y se inició correctamente." -ForegroundColor Green
-         Write-Host "   Estado actual: $($finalServiceState.Status)" -ForegroundColor Green
+    Write-Host "Creando el servicio '$serviceName'..."
+    & $nssmPath install $serviceName "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" "-ExecutionPolicy Bypass -File `"$agentScriptPath`""
+    & $nssmPath set $serviceName DisplayName $serviceDisplayName
+    & $nssmPath set $serviceName Description $serviceDescription
+    & $nssmPath set $serviceName Start SERVICE_AUTO_START
+    & $nssmPath set $serviceName AppDirectory $scriptPath
+
+    Write-Host "Servicio creado. Iniciando el servicio..." -ForegroundColor Green
+    Start-Service -Name $serviceName
+    
+    # Esperar un momento y verificar el estado
+    Start-Sleep -Seconds 3
+    $serviceInstance = Get-Service -Name $serviceName
+    if ($serviceInstance.Status -eq 'Running') {
+        Write-Host ""
+        Write-Host "------------------------------------------------------" -ForegroundColor Green
+        Write-Host " ¡ÉXITO! El servicio '$serviceName' se ha instalado y está en ejecución." -ForegroundColor Green
+        Write-Host " Estado actual:" $serviceInstance.Status -ForegroundColor Green
+        Write-Host ""
+        Write-Host " IMPORTANTE: Para que el agente acceda a recursos de red," -ForegroundColor Yellow
+        Write-Host " ve a 'services.msc', abre las propiedades del servicio y en la pestaña" -ForegroundColor Yellow
+        Write-Host " 'Iniciar sesión', configúralo con una cuenta de dominio con permisos." -ForegroundColor Yellow
+        Write-Host "------------------------------------------------------"
     } else {
-        throw "El servicio no pudo iniciarse y se encuentra en estado: $($finalServiceState.Status)"
+        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $($serviceInstance.Status)"
     }
-}
-catch {
-    $finalServiceState = Get-Service -Name $serviceName | Select-Object -ExpandProperty Status
-    Write-Host
+
+} catch {
+    Write-Host ""
     Write-Host ">>> ¡ERROR! Ocurrió un problema durante la instalación." -ForegroundColor Red
-    Write-Host "El servicio se instaló pero no pudo iniciarse. Estado actual: $finalServiceState" -ForegroundColor Yellow
-    Write-Host "Por favor, revisa el log en 'C:\Windows\Temp\ClicUpdaterAgent.log' para más detalles." -ForegroundColor Yellow
-    Write-Host
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    
+    $logPath = "C:\Windows\Temp\ClicUpdaterAgent.log"
+    if (Test-Path $logPath) {
+        Write-Host "Revisa el archivo de log para más detalles: $logPath" -ForegroundColor Yellow
+    } else {
+        Write-Host "Por favor, verifica que estás ejecutando este script como Administrador." -ForegroundColor Yellow
+    }
+
+    # Limpieza en caso de fallo
+    & $nssmPath remove $serviceName confirm | Out-Null
 }
-
-# 5. Recordatorio de credenciales de red (¡MUY IMPORTANTE!)
-Write-Host
-Write-Host "====================== PASO MANUAL OBLIGATORIO ======================" -ForegroundColor Yellow
-Write-Host " Para que el agente acceda a archivos de red, DEBES cambiar su cuenta:" -ForegroundColor White
-Write-Host " 1. Abre 'services.msc'." -ForegroundColor White
-Write-Host " 2. Busca '$serviceDisplayName' y abre sus Propiedades." -ForegroundColor White
-Write-Host " 3. Ve a la pestaña 'Iniciar sesión', selecciona 'Esta cuenta' e ingresa" -ForegroundColor White
-Write-Host "    un usuario de dominio con acceso a las carpetas de red." -ForegroundColor White
-Write-Host " 4. Guarda y REINICIA el servicio para aplicar los cambios." -ForegroundColor White
-Write-Host "=====================================================================" -ForegroundColor Yellow
-
-
-Pause-And-Exit
+finally
+{
+    Write-Host ""
+    Write-Host "------------------------------------------------------"
+    Write-Host " INSTALACION COMPLETADA."
+    Write-Host " (Puedes cerrar esta ventana)"
+    Write-Host "------------------------------------------------------"
+    Read-Host "Presiona Enter para cerrar esta ventana..."
+}
