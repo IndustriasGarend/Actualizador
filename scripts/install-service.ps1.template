@@ -1,27 +1,15 @@
-# UTF-8 with BOM
-#
-# Clic Actualizador Tools - Service Installer
-# ============================================
-# Instala el agente de PowerShell como un servicio de Windows usando nssm.exe
-#
+#Requires -RunAsAdministrator
 
-# --- CONFIGURACIÓN ---
+# --- Configuración ---
 $serviceName = "ClicActualizadorToolsAgent"
 $displayName = "Clic Actualizador Tools Agent"
-$description = "Agente de sondeo para el sistema Clic Actualizador Tools. Se comunica con el servidor central para ejecutar tareas de despliegue de software y actualizaciones."
+$description = "Agente que se comunica con el servidor de Clic Actualizador Tools para ejecutar tareas remotas."
+# --- Fin Configuración ---
 
-# --- INICIO DEL SCRIPT ---
+# Define la ruta base donde se encuentra el script
+$basePath = $PSScriptRoot
 
-# Cambiar al directorio donde se está ejecutando el script
-$scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-Set-Location -Path $scriptPath
-
-Clear-Host
-Write-Host "------------------------------------------------------"
-Write-Host " INSTALADOR DEL SERVICIO: Clic Actualizador Tools Agent"
-Write-Host "------------------------------------------------------"
-
-# --- FUNCIONES AUXILIARES ---
+#region Funciones Auxiliares
 function Is-Admin {
     try {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -29,115 +17,154 @@ function Is-Admin {
         return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     }
     catch {
+        Write-Warning "No se pudo determinar el rol del usuario. Asumiendo que no es administrador."
         return $false
     }
 }
 
-function Pause-And-Exit {
-    Write-Host "`n------------------------------------------------------"
-    Write-Host " LA INSTALACION NO PUDO COMPLETARSE."
-    Write-Host " (Puedes cerrar esta ventana)"
-    Write-Host "------------------------------------------------------"
-    Read-Host "Presiona Enter para salir..."
+function Show-MessageAndExit {
+    param(
+        [string]$Title,
+        [string]$Message,
+        [string]$FinalStatus,
+        [string]$PauseMessage = "Presiona Enter para salir..."
+    )
+    Write-Host "`n"
+    Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host " $Title" -ForegroundColor Yellow
+    Write-Host " $Message"
+    Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+    Write-Host " $FinalStatus"
+    Read-Host -Prompt $PauseMessage
     exit 1
 }
+#endregion
 
-# --- VERIFICACIONES INICIALES (GUARD CLAUSES) ---
+# --- Flujo Principal ---
 
-# 1. Verificar si se está ejecutando como Administrador
-if (-not (Is-Admin)) {
-    Write-Host "`n>>> ¡ERROR! Acceso denegado." -ForegroundColor Red
-    Write-Host "Por favor, cierra esta ventana, haz clic derecho en 'install-service.ps1' y selecciona 'Ejecutar con PowerShell'."
-    Pause-And-Exit
-}
-Write-Host "`n>>> Permisos de Administrador verificados."
-
-# 2. Verificar si nssm.exe existe
-$nssmPath = Join-Path $scriptPath "nssm.exe"
-if (-not (Test-Path $nssmPath)) {
-    Write-Host "`n>>> ¡ERROR CRÍTICO! No se encontró 'nssm.exe' en la carpeta." -ForegroundColor Red
-    Write-Host "Asegúrate de que 'nssm.exe' esté en el mismo directorio que este script."
-    Pause-And-Exit
-}
-Write-Host ">>> El ejecutable 'nssm.exe' fue encontrado."
-
-
-# --- LÓGICA PRINCIPAL DE INSTALACIÓN/REINSTALACIÓN ---
-
-$service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-
-if ($service) {
-    Write-Host "`n>>> El servicio '$displayName' ya existe. Intentando reinstalar..." -ForegroundColor Yellow
-
-    # Intentar obtener y matar el proceso del servicio para evitar bloqueos
+# 0. Bypass de Política de Ejecución (si es necesario)
+# Vuelve a lanzar el script con la política de ejecución adecuada para esta sesión.
+# Esto asegura que el script se ejecute incluso en sistemas con políticas restrictivas.
+if ($MyInvocation.CommandOrigin -eq 'File' -and $MyInvocation.Line -notlike '*-ExecutionPolicy Bypass*') {
     try {
-        $serviceProcess = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'" | Select-Object -ExpandProperty ProcessId
-        if ($serviceProcess -gt 0) {
-            Write-Host "    - Finalizando proceso del servicio existente (PID: $serviceProcess)..."
-            Stop-Process -Id $serviceProcess -Force -ErrorAction SilentlyContinue
-        }
+        $params = "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
+        Start-Process pwsh -Verb RunAs -ArgumentList $params
+        exit
     }
     catch {
-        # Ignorar errores si el proceso no se puede encontrar, etc.
+        Show-MessageAndExit -Title "ERROR DE INICIO" -Message "No se pudo reiniciar el script con PowerShell Core (pwsh). Intentando con Windows PowerShell..." -FinalStatus ""
+        try {
+            $params = "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
+            Start-Process powershell -Verb RunAs -ArgumentList $params
+            exit
+        }
+        catch {
+            Show-MessageAndExit -Title "ERROR CRÍTICO" -Message "No se pudo iniciar ni con 'pwsh' ni con 'powershell'. Asegúrate de que PowerShell esté en el PATH del sistema." -FinalStatus "INSTALACIÓN FALLIDA"
+        }
     }
-    
-    # Detener el servicio (si aún se considera en ejecución)
-    Write-Host "    - Deteniendo el servicio..."
-    Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-
-    # Eliminar el servicio
-    Write-Host "    - Eliminando la definición del servicio anterior..."
-    & sc.exe delete "$serviceName" | Out-Null
-    Start-Sleep -Seconds 3
-
-    # Verificar que el servicio fue eliminado
-    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($service) {
-        Write-Host "`n>>> ¡ERROR! No se pudo eliminar el servicio anterior." -ForegroundColor Red
-        Write-Host "    Por favor, elimínalo manualmente desde la consola de Servicios ('services.msc') e intenta de nuevo."
-        Pause-And-Exit
-    }
-    Write-Host "    - Servicio anterior eliminado con éxito."
 }
 
-# Instalar el servicio
-Write-Host "`n>>> Instalando el nuevo servicio '$displayName'..."
-$agentScriptPath = Join-Path $scriptPath "agent.ps1"
-& "$nssmPath" install "$serviceName" "$($env:SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe" "-ExecutionPolicy Bypass -File `"$agentScriptPath`""
 
-# Configurar detalles del servicio
-& "$nssmPath" set "$serviceName" AppDirectory "$scriptPath"
-& "$nssmPath" set "$serviceName" DisplayName "$displayName"
-& "$nssmPath" set "$serviceName" Description "$description"
-& "$nssmPath" set "$serviceName" Start SERVICE_AUTO_START
-& "$nssmPath" set "$serviceName" AppStopMethodSkip 6
-# Configurar para que el servicio se reinicie automáticamente en caso de fallo
-& "$nssmPath" set "$serviceName" AppExit Default Restart
-& "$nssmPath" set "$serviceName" AppRestartDelay 5000 # 5 segundos
+Clear-Host
+Write-Host "------------------------------------------------------" -ForegroundColor Green
+Write-Host " INSTALADOR DEL SERVICIO: Clic Actualizador Tools Agent" -ForegroundColor Green
+Write-Host "------------------------------------------------------" -ForegroundColor Green
+Write-Host ""
 
-Write-Host ">>> Servicio configurado."
+# 1. Verificar Permisos de Administrador
+if (-not (Is-Admin)) {
+    Show-MessageAndExit -Title "ACCESO DENEGADO" -Message "Por favor, ejecuta este script como Administrador (clic derecho > Ejecutar con PowerShell)." -FinalStatus "INSTALACIÓN FALLIDA"
+}
+Write-Host ">>> Permisos de Administrador verificados." -ForegroundColor Green
 
-# Iniciar el servicio
-Write-Host ">>> Iniciando el servicio..."
-Start-Service -Name $serviceName
+# 2. Verificar que nssm.exe exista
+$nssmPath = Join-Path $basePath "nssm.exe"
+if (-not (Test-Path $nssmPath)) {
+    Show-MessageAndExit -Title "¡ERROR CRÍTICO!" -Message "No se encontró 'nssm.exe' en la carpeta. Asegúrate de que 'nssm.exe' esté en el mismo directorio que este script." -FinalStatus "LA INSTALACIÓN NO PUDO COMPLETARSE."
+}
+Write-Host ">>> 'nssm.exe' encontrado." -ForegroundColor Green
 
-Start-Sleep -Seconds 2
+# 3. Reinstalación: Verificar si el servicio ya existe y limpiarlo
 $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+if ($service) {
+    Write-Host ">>> El servicio '$serviceName' ya existe. Procediendo a reinstalar..." -ForegroundColor Yellow
 
-if ($service -and $service.Status -eq 'Running') {
-    Write-Host "`n>>> ¡ÉXITO! El servicio se ha instalado e iniciado correctamente." -ForegroundColor Green
-    Write-Host "    Estado actual: $($service.Status)"
-} else {
-    Write-Host "`n>>> ¡ERROR! Ocurrió un problema durante la instalación." -ForegroundColor Red
-    Write-Host "    El servicio se instaló pero no pudo iniciarse. Estado actual: $($service.Status)"
-    Write-Host "    Por favor, revisa el log en 'C:\Windows\Temp\ClicUpdaterAgent.log' para más detalles."
-    Pause-And-Exit
+    try {
+        # Obtener el PID del proceso del servicio
+        $serviceProcess = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'"
+        if ($serviceProcess -and $serviceProcess.ProcessId -ne 0) {
+            Write-Host "    - Terminando el proceso del servicio existente (PID: $($serviceProcess.ProcessId))..."
+            Stop-Process -Id $serviceProcess.ProcessId -Force -ErrorAction Stop
+        }
+
+        # Pausa para dar tiempo al OS a procesar la terminación del proceso
+        Write-Host "    - Esperando 2 segundos para asegurar la liberación de recursos..."
+        Start-Sleep -Seconds 2
+
+        Write-Host "    - Eliminando la definición del servicio anterior..."
+        sc.exe delete "$serviceName" | Out-Null
+        
+        # Esperar un poco para que la eliminación se complete
+        Start-Sleep -Seconds 2
+        
+        $serviceCheck = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+        if ($serviceCheck) {
+            Show-MessageAndExit -Title "¡ERROR!" -Message "No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente desde 'services.msc' y vuelve a intentarlo." -FinalStatus "REINSTALACIÓN FALLIDA"
+        }
+
+        Write-Host ">>> Servicio anterior eliminado correctamente." -ForegroundColor Green
+    }
+    catch {
+        Show-MessageAndExit -Title "¡ERROR INESPERADO!" -Message "Ocurrió un error al intentar limpiar el servicio anterior: $($_.Exception.Message)" -FinalStatus "REINSTALACIÓN FALLIDA"
+    }
 }
 
+# 4. Instalación del Servicio
+try {
+    Write-Host ">>> Instalando el servicio '$displayName'..."
+    
+    $agentScriptPath = Join-Path $basePath "agent.ps1"
+    
+    # Instalar el servicio
+    & $nssmPath install $serviceName "powershell.exe" "-ExecutionPolicy Bypass -File `"$agentScriptPath`""
+    
+    # Configurar detalles del servicio
+    & $nssmPath set $serviceName DisplayName $displayName
+    & $nssmPath set $serviceName Description $description
+    & $nssmPath set $serviceName Start SERVICE_AUTO_START
+    
+    Write-Host ">>> Servicio instalado. Iniciando..."
+    
+    # Iniciar el servicio
+    Start-Service -Name $serviceName
+    
+    # Pausa para dar tiempo al servicio a iniciar
+    Start-Sleep -Seconds 3
+    
+    # Verificar el estado
+    $finalService = Get-Service -Name $serviceName
+    if ($finalService.Status -eq 'Running') {
+        Write-Host ""
+        Write-Host "******************************************************" -ForegroundColor Green
+        Write-Host "* ¡ÉXITO! Servicio instalado y en ejecución.        *" -ForegroundColor Green
+        Write-Host "******************************************************" -ForegroundColor Green
+    } else {
+        $logContent = ""
+        $logPath = "C:\Windows\Temp\ClicUpdaterAgent.log"
+        if (Test-Path $logPath) {
+            $logContent = Get-Content $logPath -Raw
+        }
+        Show-MessageAndExit -Title "¡ERROR!" -Message "El servicio se instaló pero no pudo iniciarse. Estado actual: $($finalService.Status). Revisa el log en '$logPath' para más detalles.`n`n$logContent" -FinalStatus "INSTALACIÓN FALLIDA"
+    }
+}
+catch {
+    Show-MessageAndExit -Title "¡ERROR DE INSTALACIÓN!" -Message "Ocurrió un problema durante la instalación: $($_.Exception.Message)" -FinalStatus "INSTALACIÓN FALLIDA"
+}
 
-Write-Host "`n------------------------------------------------------"
-Write-Host " INSTALACION FINALIZADA."
+# 5. Mensaje Final
+Write-Host ""
+Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+Write-Host " INSTALACIÓN FINALIZADA."
 Write-Host " (Puedes cerrar esta ventana)"
-Write-Host "------------------------------------------------------"
-Read-Host "Presiona Enter para cerrar esta ventana..."
+Write-Host "------------------------------------------------------" -ForegroundColor Yellow
+Read-Host -Prompt "Presiona Enter para cerrar esta ventana..."
