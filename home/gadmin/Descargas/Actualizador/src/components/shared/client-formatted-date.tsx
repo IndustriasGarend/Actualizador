@@ -11,36 +11,31 @@ interface ClientFormattedDateProps {
 }
 
 export function ClientFormattedDate({ dateString }: ClientFormattedDateProps) {
-  const [isClient, setIsClient] = useState(false);
+  const [formattedDate, setFormattedDate] = useState<string>('Nunca');
 
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (dateString) {
+      const date = new Date(dateString);
+      // Corrección para mostrar la fecha correcta sin importar la zona horaria del servidor
+      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+      const correctedDate = new Date(date.getTime() + userTimezoneOffset);
+      
+      // Usar toLocaleString para un formato amigable al usuario
+      const newFormattedDate = correctedDate.toLocaleString('es-ES', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'UTC' // La corrección ya se hizo, ahora se formatea como UTC
+      });
+      setFormattedDate(newFormattedDate);
+    } else {
+      setFormattedDate('Nunca');
+    }
+  }, [dateString]);
 
-  if (!dateString) {
-    return <>Nunca</>;
-  }
-
-  // En el servidor o antes del primer render en cliente, mostrar la fecha en un formato simple.
-  if (!isClient) {
-    return <>{dateString.split('T')[0]}</>;
-  }
-
-  // En el cliente, formatear a la zona horaria local.
-  const date = new Date(dateString);
-  // Corrección para mostrar la fecha correcta sin importar la zona horaria del servidor
-  const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-  const correctedDate = new Date(date.getTime() + userTimezoneOffset);
-  
-  // Usar toLocaleString para un formato amigable al usuario
-  const formattedDate = correctedDate.toLocaleString('es-ES', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'UTC'
-  });
-
+  // Durante el SSR o antes de que el efecto se ejecute, se muestra el valor inicial 'Nunca'
+  // o el valor anterior, evitando el parpadeo y la falta de coincidencia de hidratación.
   return <>{formattedDate}</>;
 }
