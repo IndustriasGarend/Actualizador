@@ -1,97 +1,129 @@
-# Clic Actualizador Tools - Script de Instalación del Agente
-# Versión: 1.2
-# Este script debe ejecutarse con privilegios de Administrador.
+# Impide la ejecución si no es como Administrador.
+# Redirige la salida de errores a null para evitar mensajes confusos si el script se reinicia a sí mismo.
+param()
 
-# --- Configuración ---
-$serviceName = "ClicActualizadorToolsAgent"
-$serviceDisplayName = "Clic Actualizador Tools Agent"
-$serviceDescription = "Agente para el sistema de despliegue y actualizaciones Clic Actualizador Tools."
+# --- INICIO: Autoelevación y bypass de política de ejecución ---
+# Vuelve a lanzar el script como Administrador si no lo está.
+# Y lo más importante, utiliza -ExecutionPolicy Bypass para evitar problemas en sistemas con políticas restrictivas.
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    $arguments = "& '" + $myinvocation.mycommand.definition + "'"
+    Start-Process powershell -Verb runAs -ArgumentList $arguments
+    exit
+}
 
-# --- Funciones ---
+# --- FIN: Autoelevación ---
+
+# Detiene la ejecución si hay algún error.
+$ErrorActionPreference = "Stop"
+Clear-Host
+
+# --- INICIO: Función de Verificación de Administrador (Refinada) ---
 function Is-Admin {
     try {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
         $principal = New-Object Security.Principal.WindowsPrincipal $identity
         return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    }
-    catch {
-        Write-Warning "No se pudo verificar el estado de Administrador. Asumiendo que no lo es."
+    } catch {
         return $false
     }
 }
+# --- FIN: Función de Verificación ---
 
 # --- Inicio del Script ---
+try {
+    # --- Definición de variables ---
+    $serviceName = "ClicActualizadorToolsAgent"
+    $serviceDisplayName = "Clic Actualizador Tools Agent"
+    $serviceDescription = "Agente para el sistema de despliegue y monitoreo Clic Actualizador Tools."
+    $scriptPath = Join-Path $PSScriptRoot "agent.ps1"
+    $nssmPath = Join-Path $PSScriptRoot "nssm.exe"
 
-# 1. Validar que se ejecuta como Administrador
-if (-not (Is-Admin)) {
-    Write-Error "¡Acceso denegado! Por favor, ejecuta este script como Administrador (clic derecho > Ejecutar con PowerShell)."
-    throw "Se requieren privilegios de Administrador."
-}
-Write-Host "Permisos de Administrador verificados." -ForegroundColor Green
-
-# 2. Establecer el directorio de trabajo en la ubicación del script
-$scriptPath = $PSScriptRoot
-Set-Location $scriptPath
-Write-Host "Directorio de trabajo: $scriptPath"
-
-# 3. Comprobar si el servicio ya existe para desinstalarlo primero
-$service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-if ($service) {
-    Write-Host "El servicio '$serviceName' ya existe. Deteniendo e intentando reinstalar..." -ForegroundColor Yellow
+    Write-Host "------------------------------------------------------" -ForegroundColor Green
+    Write-Host " INSTALADOR DEL SERVICIO: Clic Actualizador Tools Agent" -ForegroundColor Green
+    Write-Host "------------------------------------------------------"
+    Write-Host ""
     
-    try {
-        Stop-Service -Name $serviceName -Force -ErrorAction Stop
-        Write-Host "Servicio detenido correctamente."
-    } catch {
-        Write-Warning "No se pudo detener el servicio. Puede que ya estuviera detenido."
+    # 1. Verificar si el script se está ejecutando como Administrador
+    if (-not (Is-Admin)) {
+        throw "¡Acceso denegado! Por favor, ejecuta este script como Administrador (clic derecho > Ejecutar con PowerShell)."
     }
+    Write-Host ">>> Permisos de Administrador verificados." -ForegroundColor Cyan
 
-    # Usar sc.exe delete para una eliminación más fiable
-    sc.exe delete "$serviceName" | Out-Null
-    
-    # Dar tiempo al sistema para procesar la eliminación
-    Start-Sleep -Seconds 3
+    # 2. Verificar si nssm.exe existe
+    if (-not (Test-Path $nssmPath -PathType Leaf)) {
+        throw "¡Archivo requerido no encontrado! Asegúrate de que 'nssm.exe' esté en la misma carpeta que este instalador."
+    }
+    Write-Host ">>> nssm.exe encontrado." -ForegroundColor Cyan
 
-    # Verificar si el servicio todavía existe
+    # 3. Verificar si el servicio ya existe
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($service) {
-        Write-Error "¡ERROR! No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente desde 'services.msc' o reinicia el equipo y vuelve a intentarlo."
-        throw "La eliminación del servicio anterior falló."
+        Write-Host ""
+        Write-Host "El servicio '$serviceDisplayName' ya existe. Deteniendo e intentando reinstalar..." -ForegroundColor Yellow
+        
+        try {
+            # Detener el servicio si está corriendo
+            if ($service.Status -ne 'Stopped') {
+                Stop-Service -Name $serviceName -Force
+                $service.WaitForStatus('Stopped', [System.TimeSpan]::FromSeconds(30))
+                Write-Host ">>> Servicio detenido." -ForegroundColor Cyan
+            }
+
+            # Eliminar el servicio usando sc.exe
+            & sc.exe delete "$serviceName" | Out-Null
+            Write-Host ">>> Comando de eliminación de servicio ejecutado." -ForegroundColor Cyan
+
+            # Esperar un momento y verificar si el servicio fue eliminado
+            Start-Sleep -Seconds 3
+            $serviceCheck = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            if ($serviceCheck) {
+                throw "¡ERROR! No se pudo eliminar el servicio anterior. Por favor, elimínalo manualmente desde 'services.msc' y vuelve a ejecutar este script."
+            }
+            Write-Host ">>> Servicio anterior eliminado correctamente." -ForegroundColor Green
+
+        } catch {
+            throw "Ocurrió un error al intentar detener o eliminar el servicio existente. Detalles: $_"
+        }
     }
-    Write-Host "Servicio anterior eliminado con éxito."
-}
 
-# 4. Crear el nuevo servicio
-$agentScriptPath = Join-Path $scriptPath "agent.ps1"
-if (-not (Test-Path $agentScriptPath)) {
-    Write-Error "¡ERROR! No se encuentra el archivo 'agent.ps1' en la ruta '$scriptPath'."
-    throw "Archivo del agente no encontrado."
-}
+    # 4. Instalar el nuevo servicio usando nssm
+    Write-Host ""
+    Write-Host "Instalando el servicio..." -ForegroundColor Cyan
+    & $nssmPath install $serviceName "powershell.exe" "-ExecutionPolicy Bypass -File `"$scriptPath`""
+    & $nssmPath set $serviceName DisplayName $serviceDisplayName
+    & $nssmPath set $serviceName Description $serviceDescription
+    & $nssmPath set $serviceName Start SERVICE_AUTO_START
+    & $nssmPath set $serviceName AppStopMethodSkip 6
+    
+    Write-Host ">>> Servicio '$serviceDisplayName' instalado." -ForegroundColor Green
+    
+    # 5. Iniciar el servicio
+    Write-Host "Iniciando el servicio..." -ForegroundColor Cyan
+    Start-Service -Name $serviceName
+    
+    # Verificar el estado final
+    $finalStatus = (Get-Service -Name $serviceName).Status
+    if ($finalStatus -ne "Running") {
+        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $finalStatus. Revisa los logs en C:\Windows\Temp\ClicUpdaterAgent.log para más detalles."
+    }
 
-try {
-    New-Service -Name $serviceName -BinaryPathName "powershell.exe -ExecutionPolicy Bypass -File `"$agentScriptPath`"" -DisplayName $serviceDisplayName -Description $serviceDescription -StartupType Automatic -ErrorAction Stop
-    Write-Host "Servicio '$serviceName' creado con éxito." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "------------------------------------------------------" -ForegroundColor Green
+    Write-Host " ¡ÉXITO! El servicio ha sido instalado e iniciado." -ForegroundColor Green
+    Write-Host " Estado final del servicio: $finalStatus" -ForegroundColor Green
+    Write-Host " (Recuerda configurar la cuenta de red en services.msc)" -ForegroundColor Yellow
+    Write-Host "------------------------------------------------------"
+
 } catch {
-    Write-Error "¡ERROR! No se pudo crear el servicio. Error: $($_.Exception.Message)"
-    throw "La creación del servicio falló."
+    # Captura cualquier error que haya ocurrido durante el proceso
+    Write-Host ""
+    Write-Error "¡ERROR! Ocurrió un problema durante la instalación. $_"
+} finally {
+    # Esto se ejecuta siempre, haya error o no.
+    Write-Host ""
+    Write-Host "------------------------------------------------------"
+    Write-Host " INSTALACION FINALIZADA."
+    Write-Host " (Puedes cerrar esta ventana)"
+    Write-Host "------------------------------------------------------"
+    Read-Host "Presiona Enter para cerrar esta ventana..."
 }
-
-# 5. Iniciar el servicio
-try {
-    Start-Service -Name $serviceName -ErrorAction Stop
-    Write-Host "Servicio iniciado. Estado actual: $((Get-Service -Name $serviceName).Status)" -ForegroundColor Green
-    Write-Host "¡ÉXITO! El agente ha sido instalado y está corriendo." -ForegroundColor Cyan
-} catch {
-    $serviceStatus = (Get-Service -Name $serviceName -ErrorAction SilentlyContinue).Status
-    Write-Error "¡ERROR! Ocurrió un problema durante la instalación."
-    Write-Error "El servicio se instaló pero no pudo iniciarse. Estado actual: $serviceStatus"
-    Write-Error "Por favor, verifica que estás ejecutando este script como Administrador y revisa los logs de eventos de Windows para más detalles."
-    Write-Error "También puedes revisar el log del agente en C:\Windows\Temp\ClicUpdaterAgent.log"
-}
-
-# --- Finalización ---
-Write-Host "------------------------------------------------------"
-Write-Host " INSTALACION COMPLETADA."
-Write-Host " (Puedes cerrar esta ventana)"
-Write-Host "------------------------------------------------------"
-Read-Host "Presiona Enter para cerrar esta ventana..."
