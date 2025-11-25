@@ -39,14 +39,17 @@ export interface LogEntry {
   versionId?: string | null;
 }
 
-export type PackageType = 'actualizacion_archivos' | 'ejecutar_script' | 'comando_powershell';
+export type PackageType = 'actualizacion_archivos' | 'ejecutar_script' | 'comando_powershell' | 'registro_componentes';
 
 export interface Package {
   id: number;
   name: string;
   description: string | null;
   packageType: PackageType;
-  // Campos para actualizacion_archivos y ejecutar_script
+  // updateFilePath se usa para:
+  // - actualizacion_archivos: ruta al .zip
+  // - ejecutar_script: ruta al .bat/.ps1
+  // - registro_componentes: ruta al .xml
   updateFilePath: string | null; 
   // Campos para actualizacion_archivos
   localUpdateDir: string | null;

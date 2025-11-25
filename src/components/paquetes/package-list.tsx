@@ -18,7 +18,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Edit, Trash2, Package as PackageIcon, FileCode, Terminal } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Package as PackageIcon, FileCode, Terminal, FileCog } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -55,6 +55,11 @@ const packageTypeDetails = {
         label: "Comando PS",
         icon: Terminal,
         variant: "outline"
+    },
+    registro_componentes: {
+        label: "Registro Componentes",
+        icon: FileCog,
+        variant: "default"
     },
 } as const;
 
@@ -123,7 +128,7 @@ export function PackageList({ packages: initialPackages }: PackageListProps) {
                                     <TableRow key={pkg.id}>
                                         <TableCell className="font-medium">{pkg.name}</TableCell>
                                         <TableCell>
-                                            <Badge variant={details.variant as any}>
+                                            <Badge variant={details.variant as any} className={pkg.packageType === 'registro_componentes' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}>
                                                 <details.icon className="mr-2 h-4 w-4" />
                                                 {details.label}
                                             </Badge>

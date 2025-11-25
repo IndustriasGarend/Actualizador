@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import type { Package, PackageType } from '@/lib/types';
+import type { Package } from '@/lib/types';
 import { Loader2, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 const formSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido.'),
   description: z.string().optional(),
-  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell'], {
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell', 'registro_componentes'], {
     required_error: "Debe seleccionar un tipo de paquete.",
   }),
   // Campos condicionales
@@ -46,12 +46,12 @@ const formSchema = z.object({
     message: 'La ruta del archivo y el directorio de instalación son requeridos para este tipo de paquete.',
     path: ['installDir'],
 }).refine(data => {
-    if (data.packageType === 'ejecutar_script') {
+    if (data.packageType === 'ejecutar_script' || data.packageType === 'registro_componentes') {
         return !!data.updateFilePath;
     }
     return true;
 }, {
-    message: 'La ruta del script es requerida.',
+    message: 'La ruta del archivo es requerida.',
     path: ['updateFilePath'],
 }).refine(data => {
     if (data.packageType === 'comando_powershell') {
@@ -179,6 +179,7 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
                                     <SelectItem value="actualizacion_archivos">Actualización de Archivos (copiar y pegar)</SelectItem>
                                     <SelectItem value="ejecutar_script">Ejecutar Script (.bat, .ps1)</SelectItem>
                                     <SelectItem value="comando_powershell">Comando PowerShell (ej. winget)</SelectItem>
+                                    <SelectItem value="registro_componentes">Registro de Componentes (desde XML)</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -272,6 +273,20 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
                         </FormItem>
                     )} />
                 </div>
+            )}
+
+            {packageType === 'registro_componentes' && (
+                 <div className="space-y-6 animate-in fade-in">
+                    <h3 className="text-lg font-medium text-primary">Parámetros de Registro de Componentes</h3>
+                    <FormField control={form.control} name="updateFilePath" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center">Ruta de red del archivo XML de registro<HelpTooltip>Ruta de red completa (UNC) al archivo .xml que define los componentes a registrar.</HelpTooltip></FormLabel>
+                            <FormControl><Input placeholder="\\\\servidor\\share\\ERPReg.xml" {...field} /></FormControl>
+                            <FormDescription>El agente leerá este archivo y registrará los componentes listados.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                 </div>
             )}
             </div>
           </CardContent>

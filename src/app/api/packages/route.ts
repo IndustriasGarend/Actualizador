@@ -5,7 +5,7 @@ import { z } from 'zod';
 const packageSchema = z.object({
   name: z.string().min(1, 'El nombre del paquete es requerido.'),
   description: z.string().optional(),
-  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell']),
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell', 'registro_componentes']),
   updateFilePath: z.string().optional(),
   localUpdateDir: z.string().optional(),
   installDir: z.string().optional(),
