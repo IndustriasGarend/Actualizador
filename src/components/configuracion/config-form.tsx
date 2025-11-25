@@ -20,20 +20,18 @@ import type { SystemConfig } from '@/lib/types';
 import { Loader2, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Textarea } from '../ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 
 const formSchema = z.object({
   updateFilePath: z.string().min(1, 'La ruta del archivo es requerida.'),
   localUpdateDir: z.string().min(1, 'El directorio local es requerido.'),
   softlandInstallDir: z.string().min(1, 'El directorio de instalación es requerido.'),
   serviceName: z.string().min(1, 'El nombre del servicio es requerido.'),
-  adminUser: z.string().min(1, 'El usuario administrador es requerido.'),
-  adminPass: z.string(),
   environmentPath: z.string().optional(),
 });
 
 interface ConfigFormProps {
-  initialConfig: SystemConfig;
+  initialConfig: Omit<SystemConfig, 'adminUser' | 'adminPass'>;
 }
 
 const HelpTooltip = ({ children }: { children: React.ReactNode }) => (
@@ -106,7 +104,7 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                     <FormLabel className="flex items-center">
                         Ruta de archivo de actualización
                         <HelpTooltip>
-                            Ruta de red completa (UNC Path) al archivo comprimido (.7z, .zip, etc.) que contiene la actualización de Softland. El agente debe tener permisos de lectura a esta ruta. Ej: \\\\servidor\\updates\\update.7z
+                            Ruta de red completa (UNC Path) al archivo comprimido (.7z, .zip, etc.) que contiene la actualización de Softland. La cuenta de servicio del agente debe tener permisos de lectura a esta ruta. Ej: \\\\servidor\\updates\\update.7z
                         </HelpTooltip>
                     </FormLabel>
                     <FormControl>
@@ -195,46 +193,6 @@ export function ConfigForm({ initialConfig }: ConfigFormProps) {
                     </FormItem>
                   )}
                 />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t">
-              <FormField
-                control={form.control}
-                name="adminUser"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center">
-                        Usuario Administrador
-                        <HelpTooltip>
-                           La cuenta con la que se ejecutará el servicio del agente en cada PC. Debe tener permisos de administrador local y acceso a la ruta de red del archivo de actualización. El formato debe ser DOMINIO\\usuario.
-                        </HelpTooltip>
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="DOMINIO\\usuario" {...field} />
-                    </FormControl>
-                    <FormDescription>Cuenta para ejecutar el servicio en el cliente (ej. `DOMINIO\usuario.servicio`).</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="adminPass"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center">
-                        Contraseña de Administrador
-                        <HelpTooltip>
-                            La contraseña de la cuenta de servicio. No se guarda en el servidor. El script de instalación la solicitará de forma segura en la PC cliente para configurar el servicio de Windows.
-                        </HelpTooltip>
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormDescription>Se solicitará al instalar el servicio en el cliente. No se guarda en el servidor.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-4">

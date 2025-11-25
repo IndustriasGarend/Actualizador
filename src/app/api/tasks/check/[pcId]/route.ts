@@ -3,18 +3,18 @@ import { db } from '@/lib/db';
 import { LATEST_AGENT_VERSION, defaultConfig } from '@/lib/data';
 import type { SystemConfig } from '@/lib/types';
 
-function getSystemConfig(): SystemConfig {
+function getSystemConfig(): Omit<SystemConfig, 'adminUser' | 'adminPass'> {
   const stmt = db.prepare('SELECT * FROM settings');
   const rows = stmt.all() as { key: string; value: string }[];
   
-  const config = rows.reduce((acc, row) => {
+  const configMap = rows.reduce((acc, row) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     acc[row.key] = row.value;
     return acc;
-  }, {});
+  }, {} as Record<string, string>);
 
-  return { ...defaultConfig, ...config };
+  return { ...defaultConfig, ...configMap };
 }
 
 

@@ -201,7 +201,7 @@ export default function HelpPage() {
                             <li><Badge variant="secondary">Pendiente</Badge>: Se ha enviado una orden de actualizacion, pero el agente aun no la ha comenzado.</li>
                             <li><Badge className="bg-primary/80 text-primary-foreground animate-pulse">En progreso</Badge>: El agente esta ejecutando una actualizacion en este momento.</li>
                             <li><Badge variant="destructive">Error</Badge>: Ocurrio un problema durante el ultimo intento de actualizacion. Revisa el historial para mas detalles.</li>
-                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea de actualizacion fue cancelada manualmente desde el panel.</li>
+                            <li><Badge className="bg-yellow-500 text-white">Cancelado</Badge>: La tarea de actualizacion fue cancelada manually desde el panel.</li>
                             <li><Badge className="bg-slate-500 text-white">Deshabilitado</Badge>: La PC esta inactiva y no recibira ordenes de actualizacion.</li>
                          </ul>
                     </li>
@@ -260,11 +260,14 @@ export default function HelpPage() {
                      <li>
                         <strong>Rutas para variable de entorno PATH:</strong> Permite añadir rutas al PATH del sistema de las PCs cliente de forma centralizada. Separa cada ruta con un punto y coma (;). El agente se asegurara de no añadir rutas duplicadas.
                     </li>
-                     <li>
-                        <strong>Usuario Administrador:</strong> Define la cuenta de usuario con la que se debe instalar el servicio del agente. Es crucial que esta cuenta tenga permisos de administrador local en la PC y acceso a la ruta de red. El formato debe ser `DOMINIO\\usuario` (ej. `ING\\admin.softland`).
-                    </li>
                 </ul>
-
+                <Alert variant="default">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Importante: Permisos de Red</AlertTitle>
+                    <AlertDescription>
+                        El servicio del agente, para poder acceder a la ruta de red, debe ejecutarse con una cuenta de dominio que tenga permisos de lectura sobre esa carpeta compartida. Esta configuración se realiza manualmente en cada PC cliente después de la instalación.
+                    </AlertDescription>
+                </Alert>
                 <h4 className="font-semibold text-lg pt-2 border-t">Descargar Instalador del Agente (<HardDriveDownload className="inline h-4 w-4"/>)</h4>
                  <ul className="list-disc space-y-3 pl-6">
                     <li>Esta seccion te permite descargar el **paquete de instalacion generico** para el agente.</li>
@@ -311,23 +314,31 @@ export default function HelpPage() {
                              <li>Esta URL se guarda en un archivo `config.json` local para que el agente sepa a donde comunicarse.</li>
                         </ul>
                     </li>
-                    <li>
-                        <strong>Ingresar Credenciales del Servicio:</strong>
+                     <li>
+                        <strong>Verificar la Instalación:</strong>
                          <ul className="list-[circle] space-y-2 pl-5 mt-2 text-sm">
                              <li>
-                                <div>
-                                A continuacion, la consola te pedira un usuario y contraseña. Debes ingresar las credenciales de la cuenta de servicio que definiste en la configuracion general del panel (ej. `ING\\admin.softland`).
-                                </div>
+                                Si todo sale bien, la consola mostrará un mensaje de "¡ÉXITO!". La ventana permanecerá abierta para que puedas leer el resultado.
                              </li>
-                             <li>Estas credenciales se usan para que el servicio de Windows se ejecute con los permisos adecuados. **No se guardan en ningun archivo de texto plano.**</li>
+                             <li>El nuevo servicio llamado `Softland Updater Agent` se habrá instalado y estará ejecutándose con la cuenta `Sistema Local`.</li>
                         </ul>
                     </li>
                 </ol>
-                <Alert variant="default" className="mt-4">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>¡Instalacion Completa!</AlertTitle>
+                <Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800">
+                    <AlertTriangle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle>PASO MANUAL Y OBLIGATORIO: Configurar Credenciales de Red</AlertTitle>
                     <AlertDescription>
-                        Si todo salio bien, el script confirmara que el servicio fue creado e iniciado. La nueva PC aparecera automaticamente en el panel de control, usando su propio `hostname` como identificador unico. El script de instalacion es inteligente: buscara y desinstalara versiones antiguas del agente antes de instalar la nueva.
+                       <div className="space-y-2">
+                        <p>Para que el agente pueda acceder a los archivos de actualización en la red, debes cambiar la cuenta con la que se ejecuta.</p>
+                        <ol className="list-decimal pl-5 space-y-1">
+                            <li>Abre la consola de Servicios de Windows (`services.msc`).</li>
+                            <li>Busca el servicio <strong>"Softland Updater Agent"</strong> y abre sus propiedades.</li>
+                            <li>Ve a la pestaña <strong>"Iniciar sesión"</strong>.</li>
+                            <li>Selecciona "Esta cuenta" e ingresa las credenciales de un usuario de dominio que tenga permisos de lectura sobre la carpeta de red donde se encuentra el archivo de actualización.</li>
+                            <li>Guarda los cambios y reinicia el servicio.</li>
+                        </ol>
+                        <p>La nueva PC aparecerá automáticamente en el panel de control después de unos minutos.</p>
+                       </div>
                     </AlertDescription>
                 </Alert>
             </div>
@@ -347,7 +358,7 @@ export default function HelpPage() {
                         El agente inicia y recolecta informacion clave: su propia version, el nombre del equipo (`hostname`), la IP actual, el usuario con sesion activa y un inventario basico de hardware.
                     </li>
                      <li>
-                        Envía toda esta informacion al servidor para solicitar instrucciones. Si es la primera vez que se conecta, el servidor lo registrara como una nueva PC.
+                        Envía toda esta informacion al servidor para solicitar instrucciones. Si es la primera vez que se conecta, el servidor lo registrara como una nueva PC usando su `hostname`.
                     </li>
                 </ul>
                  <h4 className="font-semibold text-lg pt-2 border-t">Paso 2: Recepcion y Priorizacion de Ordenes</h4>

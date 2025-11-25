@@ -1,125 +1,86 @@
-#requires -version 5
-# Script para instalar y configurar el servicio del Agente de Softland Updater
-
-param(
-    [string]$BaseUrl
+#Requires -RunAsAdministrator
+param (
+    [string]$ServiceName = "SoftlandUpdaterAgent"
 )
 
-# --- INICIO DEL SCRIPT ---
-$ErrorActionPreference = "Stop" # Detiene el script en el primer error
+# Funcion para escribir mensajes de estado
+function Write-Status($message) {
+    Write-Host $message -ForegroundColor Cyan
+}
 
-$serviceName = "SoftlandUpdaterAgent"
-$serviceDisplayName = "Softland Updater Agent"
-$serviceDescription = "Agente que se comunica con el panel de Softland Updater para ejecutar tareas de actualización."
+# Funcion para escribir mensajes de exito
+function Write-Success($message) {
+    Write-Host $message -ForegroundColor Green
+}
 
-# Obtener el directorio donde se encuentra este script
-$scriptPath = $PSScriptRoot
-
-# Ruta completa al ejecutable del agente
-$agentExePath = Join-Path -Path $scriptPath -ChildPath "agent.exe"
-
-# --- Comienzo de la lógica de instalación ---
-try {
-    Write-Host "Ejecutando el script de configuracion de PowerShell..."
-
-    # --- Desinstalación de versiones anteriores ---
-    Write-Host ""
-    Write-Host "Buscando versiones anteriores del servicio..."
-    $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($existingService) {
-        Write-Host "Servicio '$serviceName' encontrado. Deteniendo y eliminando..."
-        Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-        # Esperar un poco para que el servicio se detenga completamente
-        Start-Sleep -Seconds 5
-        Remove-Service -Name $serviceName -Force
-        Write-Host "Servicio anterior eliminado."
-    } else {
-        Write-Host "No se encontraron servicios anteriores."
-    }
-    
-    # --- Creación de config.json ---
-    Write-Host ""
-    $configPath = Join-Path -Path $scriptPath -ChildPath "config.json"
-    $configContent = @{
-        "baseUrl" = $BaseUrl
-    } | ConvertTo-Json
-    
-    # Asegurarse de que la carpeta exista
-    if (-not (Test-Path -Path $scriptPath)) {
-        New-Item -Path $scriptPath -ItemType Directory -Force | Out-Null
-    }
-    
-    Set-Content -Path $configPath -Value $configContent -Encoding UTF8
-    Write-Host "Archivo de configuracion 'config.json' creado."
-
-    # --- Solicitud de credenciales ---
-    Write-Host ""
-    Write-Host "--> Se necesitan las credenciales de una cuenta con permisos para ejecutar el servicio."
-    Write-Host "    Esta cuenta debe tener acceso de administrador local y a las rutas de red."
-    $credential = Get-Credential
-    if (-not $credential) {
-        throw "La operacion fue cancelada. No se proporcionaron credenciales."
-    }
-
-    # --- Creación del nuevo servicio ---
-    Write-Host ""
-    Write-Host "Creando el nuevo servicio '$serviceName'..."
-    New-Service -Name $serviceName `
-                -BinaryPathName "$agentExePath" `
-                -DisplayName $serviceDisplayName `
-                -Description $serviceDescription `
-                -StartupType Automatic
-
-    Write-Host "Servicio creado. Configurando credenciales..."
-
-    # --- ASIGNACIÓN DE CREDENCIALES (MÉTODO CORRECTO) ---
-    $service = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'"
-    if (-not $service) {
-        throw "No se pudo encontrar el servicio '$serviceName' despues de crearlo."
-    }
-
-    $arguments = @{
-        StartName     = $credential.UserName;
-        StartPassword = $credential.GetNetworkCredential().Password
-    }
-    
-    $result = Invoke-CimMethod -InputObject $service -MethodName "Change" -Arguments $arguments
-    
-    if ($result.ReturnValue -ne 0) {
-        throw "Error al establecer las credenciales del servicio. Codigo de error: $($result.ReturnValue)"
-    }
-    
-    Write-Host "Credenciales asignadas correctamente."
-
-    # --- Iniciar el servicio ---
-    Write-Host "Iniciando el servicio..."
-    Start-Service -Name $serviceName
-    Start-Sleep -Seconds 2 # Darle un momento para que arranque
-    
-    # Verificar que el servicio esté corriendo
-    $finalStatus = Get-Service -Name $serviceName
-    if ($finalStatus.Status -ne 'Running') {
-        throw "El servicio se instaló pero no pudo iniciarse. Estado actual: $($finalStatus.Status)"
-    }
-    
-    # --- Mensaje de Éxito ---
-    Write-Host ""
-    Write-Host "------------------------------------------------------------------" -ForegroundColor Green
-    Write-Host ">>> ¡ÉXITO! El servicio del Agente Softland Updater se instaló e inició correctamente." -ForegroundColor Green
-    Write-Host "La PC debería aparecer en el panel de control en breve." -ForegroundColor Green
-    Write-Host "------------------------------------------------------------------" -ForegroundColor Green
-    Write-Host ""
-    
-} catch {
-    # --- Manejo de Errores ---
-    Write-Host ""
-    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+# Funcion para escribir errores y salir
+function Write-ErrorAndExit($message) {
     Write-Host ">>> ¡ERROR!" -ForegroundColor Red
     Write-Host "Ocurrió un error durante la instalación:" -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
-    Write-Host ""
-    
-    # Salir con un código de error para que el .bat lo detecte
+    Write-Host $message -ForegroundColor Yellow
     exit 1
+}
+
+# --- INICIO DEL SCRIPT ---
+try {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $scriptDir = Split-Path $scriptPath
+
+    # 1. Desinstalar version anterior si existe
+    Write-Status "Buscando versiones anteriores del servicio..."
+    $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($existingService) {
+        Write-Status "Se encontró un servicio existente. Deteniendo y eliminándolo..."
+        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+        
+        # Usar sc.exe delete, que es un comando estándar y confiable
+        $deleteResult = sc.exe delete $ServiceName
+        Write-Status "Resultado de la eliminación: $deleteResult"
+        # Pausa para asegurar que el servicio se elimine antes de recrearlo
+        Start-Sleep -Seconds 5 
+    } else {
+        Write-Status "No se encontraron servicios anteriores."
+    }
+
+    # 2. Solicitar URL del servidor
+    $configFile = Join-Path $scriptDir "config.json"
+    $serverUrl = $null
+
+    while (-not $serverUrl) {
+        $serverUrl = Read-Host -Prompt "--> Por favor, ingresa la URL del servidor (ej. http://192.168.1.100:9002)"
+        if (-not ($serverUrl -match "^https?://")) {
+            Write-Host "URL inválida. Debe comenzar con http:// o https://" -ForegroundColor Yellow
+            $serverUrl = $null
+        }
+    }
+    
+    # Guardar la configuracion en config.json
+    $config = @{ serverUrl = $serverUrl }
+    $config | ConvertTo-Json | Set-Content -Path $configFile -Encoding utf8
+    Write-Status "Archivo de configuracion 'config.json' creado."
+
+    # 3. Crear el nuevo servicio para ejecutarse como LocalSystem
+    Write-Status "Creando el nuevo servicio '$ServiceName' para ejecutarse como LocalSystem..."
+    $agentPath = Join-Path $scriptDir "agent.ps1"
+    New-Service -Name $ServiceName -BinaryPathName "powershell.exe -ExecutionPolicy Bypass -File `"$agentPath`"" -DisplayName "Softland Updater Agent" -Description "Agente para gestionar actualizaciones remotas de Softland." -StartupType Automatic
+    
+    Write-Success "Servicio '$ServiceName' creado exitosamente."
+
+    # 4. Iniciar el servicio
+    Write-Status "Iniciando el servicio..."
+    Start-Service -Name $ServiceName
+    
+    Start-Sleep -Seconds 2
+    $serviceStatus = (Get-Service -Name $ServiceName).Status
+    Write-Status "Estado final del servicio: $serviceStatus"
+
+    if ($serviceStatus -ne "Running") {
+        Write-ErrorAndExit "El servicio se creó, pero no pudo iniciarse. Verifique el Visor de Eventos para más detalles."
+    }
+
+    Write-Success ">>> ¡ÉXITO! El servicio se instaló e inició correctamente como LocalSystem."
+
+}
+catch {
+    Write-ErrorAndExit $_.Exception.Message
 }

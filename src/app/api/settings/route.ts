@@ -8,8 +8,6 @@ const formSchema = z.object({
   localUpdateDir: z.string().min(1),
   softlandInstallDir: z.string().min(1),
   serviceName: z.string().min(1),
-  adminUser: z.string().min(1),
-  adminPass: z.string().optional(),
   environmentPath: z.string().optional(),
 });
 
@@ -23,10 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Datos de configuración inválidos', errors: validatedBody.error.flatten() }, { status: 400 });
     }
 
-    const config = validatedBody.data;
-    
-    // El adminPass no se guarda en la base de datos por seguridad
-    const { adminPass, ...configToSave } = config;
+    const configToSave = validatedBody.data;
 
     const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     

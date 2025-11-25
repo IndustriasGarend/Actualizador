@@ -5,20 +5,18 @@ import { defaultConfig } from '@/lib/data';
 import { db } from '@/lib/db';
 import type { SystemConfig } from '@/lib/types';
 
-function getSystemConfig(): SystemConfig {
+function getSystemConfig(): Omit<SystemConfig, 'adminUser' | 'adminPass'> {
   const stmt = db.prepare('SELECT key, value FROM settings');
   const rows = stmt.all() as { key: string; value: string }[];
   
   const settingsMap = new Map(rows.map(row => [row.key, row.value]));
 
-  const config: SystemConfig = {
+  const config = {
     updateFilePath: settingsMap.get('updateFilePath') || defaultConfig.updateFilePath,
     localUpdateDir: settingsMap.get('localUpdateDir') || defaultConfig.localUpdateDir,
     softlandInstallDir: settingsMap.get('softlandInstallDir') || defaultConfig.softlandInstallDir,
     serviceName: settingsMap.get('serviceName') || defaultConfig.serviceName,
-    adminUser: settingsMap.get('adminUser') || defaultConfig.adminUser,
     environmentPath: settingsMap.get('environmentPath') || defaultConfig.environmentPath,
-    adminPass: '', // La contraseña nunca se carga, siempre está vacía en el formulario
   };
 
   return config;
