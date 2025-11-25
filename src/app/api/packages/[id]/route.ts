@@ -4,8 +4,9 @@ import { z } from 'zod';
 
 const packageSchema = z.object({
   name: z.string().min(1, 'El nombre del paquete es requerido.'),
+  version: z.string().optional(),
   description: z.string().optional(),
-  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell']),
+  packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell', 'registro_componentes']),
   updateFilePath: z.string().optional(),
   localUpdateDir: z.string().optional(),
   installDir: z.string().optional(),
@@ -54,11 +55,12 @@ export async function PUT(
       return NextResponse.json({ message: 'Datos de paquete inválidos', errors: validatedBody.error.flatten() }, { status: 400 });
     }
     
-    const { name, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command, postInstallScript } = validatedBody.data;
+    const { name, version, description, packageType, updateFilePath, localUpdateDir, installDir, serviceName, environmentPath, command, postInstallScript } = validatedBody.data;
     
     const stmt = db.prepare(
         `UPDATE packages SET 
             name = ?, 
+            version = ?,
             description = ?, 
             packageType = ?,
             updateFilePath = ?, 
@@ -71,7 +73,8 @@ export async function PUT(
         WHERE id = ?`
     );
     const result = stmt.run(
-        name, 
+        name,
+        version || null,
         description || null, 
         packageType,
         updateFilePath || null, 

@@ -43,6 +43,7 @@ function runMigrations() {
             CREATE TABLE IF NOT EXISTS packages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
+                version TEXT,
                 description TEXT,
                 packageType TEXT NOT NULL,
                 updateFilePath TEXT,
@@ -93,12 +94,18 @@ function runMigrations() {
         `);
 
         // --- Migraciones de Estructura ---
-        const tableInfo = db.prepare("PRAGMA table_info(packages)").all();
-        const columnExists = tableInfo.some(col => (col as any).name === 'postInstallScript');
-
-        if (!columnExists) {
+        const packagesTableInfo = db.prepare("PRAGMA table_info(packages)").all();
+        
+        const postInstallScriptExists = packagesTableInfo.some(col => (col as any).name === 'postInstallScript');
+        if (!postInstallScriptExists) {
             console.log("Añadiendo columna 'postInstallScript' a la tabla 'packages'...");
             db.exec('ALTER TABLE packages ADD COLUMN postInstallScript TEXT');
+        }
+
+        const versionExists = packagesTableInfo.some(col => (col as any).name === 'version');
+        if (!versionExists) {
+            console.log("Añadiendo columna 'version' a la tabla 'packages'...");
+            db.exec('ALTER TABLE packages ADD COLUMN version TEXT');
         }
 
     })();

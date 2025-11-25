@@ -27,6 +27,7 @@ import { Separator } from '../ui/separator';
 
 const formSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido.'),
+  version: z.string().optional(),
   description: z.string().optional(),
   packageType: z.enum(['actualizacion_archivos', 'ejecutar_script', 'comando_powershell', 'registro_componentes'], {
     required_error: "Debe seleccionar un tipo de paquete.",
@@ -93,6 +94,7 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
         name: initialPackage?.name || '',
+        version: initialPackage?.version || '',
         description: initialPackage?.description || '',
         packageType: initialPackage?.packageType || undefined,
         updateFilePath: initialPackage?.updateFilePath || '',
@@ -153,7 +155,7 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FormField
+                <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
@@ -168,28 +170,46 @@ export function PackageForm({ initialPackage }: PackageFormProps) {
                 />
                  <FormField
                     control={form.control}
-                    name="packageType"
+                    name="version"
                     render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Tipo de Paquete</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione un tipo de ejecución" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="actualizacion_archivos">Actualización de Archivos (copiar y pegar)</SelectItem>
-                                    <SelectItem value="ejecutar_script">Ejecutar Script (.bat, .ps1)</SelectItem>
-                                    <SelectItem value="comando_powershell">Comando PowerShell (ej. winget)</SelectItem>
-                                    <SelectItem value="registro_componentes">Registro de Componentes (desde XML)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
+                    <FormItem>
+                        <FormLabel className="flex items-center">
+                            Versión
+                            <HelpTooltip>
+                                (Opcional) Un identificador para esta versión del paquete, ej. "v1.2.3" o "2024-07-30".
+                            </HelpTooltip>
+                        </FormLabel>
+                        <FormControl>
+                        <Input placeholder="Ej: v1.2.3" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
                     )}
-                 />
+                />
             </div>
+            <FormField
+                control={form.control}
+                name="packageType"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Tipo de Paquete</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccione un tipo de ejecución" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="actualizacion_archivos">Actualización de Archivos (copiar y pegar)</SelectItem>
+                                <SelectItem value="ejecutar_script">Ejecutar Script (.bat, .ps1)</SelectItem>
+                                <SelectItem value="comando_powershell">Comando PowerShell (ej. winget)</SelectItem>
+                                <SelectItem value="registro_componentes">Registro de Componentes (desde XML)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )}
+                />
              <FormField
                 control={form.control}
                 name="description"

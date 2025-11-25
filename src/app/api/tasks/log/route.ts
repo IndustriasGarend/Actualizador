@@ -25,46 +25,81 @@ export async function POST(request: Request) {
         pcStatus = 'Cancelado';
     }
 
-    let updateQuery = "UPDATE pcs SET status = ?, lastUpdate = datetime('now')";
-    const params: (string | number | null)[] = [pcStatus];
-
-    if (pcStatus === 'Actualizado' && versionId) {
-        updateQuery += ", versionId = ?";
-        params.push(versionId);
-    }
-    if (agentVersion) {
-        updateQuery += ", agentVersion = ?";
-        params.push(agentVersion);
-    }
-    if (ip) {
-        updateQuery += ", ip = ?";
-        params.push(ip);
-    }
-    if (loggedUser) {
-        updateQuery += ", loggedUser = ?";
-        params.push(loggedUser);
-    }
-    // Corregido para leer del objeto anidado 'hardwareInfo'
-    if(hardwareInfo) {
-        updateQuery += ", osName = ?, osVersion = ?, cpuModel = ?, cpuCores = ?, totalMemory = ?, disks = ?";
-        params.push(
-            hardwareInfo.osName || null,
-            hardwareInfo.osVersion || null,
-            hardwareInfo.cpuModel || null,
-            hardwareInfo.cpuCores || null,
-            hardwareInfo.totalMemory || null,
-            hardwareInfo.disks || null
-        );
-    }
+    // Solo actualizamos el estado y la fecha si la tarea terminó (no si está "En progreso")
     if (pcStatus !== 'En progreso') {
-        updateQuery += ", currentTaskId = NULL";
+        let updateQuery = "UPDATE pcs SET status = ?, lastUpdate = datetime('now')";
+        const params: (string | number | null)[] = [pcStatus];
+
+        if (pcStatus === 'Actualizado' && versionId) {
+            updateQuery += ", versionId = ?";
+            params.push(versionId);
+        }
+        if (agentVersion) {
+            updateQuery += ", agentVersion = ?";
+            params.push(agentVersion);
+        }
+        if (ip) {
+            updateQuery += ", ip = ?";
+            params.push(ip);
+        }
+        if (loggedUser) {
+            updateQuery += ", loggedUser = ?";
+            params.push(loggedUser);
+        }
+        if(hardwareInfo) {
+            updateQuery += ", osName = ?, osVersion = ?, cpuModel = ?, cpuCores = ?, totalMemory = ?, disks = ?";
+            params.push(
+                hardwareInfo.osName || null,
+                hardwareInfo.osVersion || null,
+                hardwareInfo.cpuModel || null,
+                hardwareInfo.cpuCores || null,
+                hardwareInfo.totalMemory || null,
+                hardwareInfo.disks || null
+            );
+        }
+        
+        updateQuery += ", currentTaskId = NULL WHERE id = ?";
+        params.push(pcId);
+        
+        const pcStmt = db.prepare(updateQuery);
+        pcStmt.run(...params);
+    } else {
+        // Si la tarea está en progreso, solo actualizamos los datos que no dependen del estado final
+        const updateQueryParts: string[] = [];
+        const params: (string | number | null)[] = [];
+        
+        if (agentVersion) {
+            updateQueryParts.push("agentVersion = ?");
+            params.push(agentVersion);
+        }
+        if (ip) {
+            updateQueryParts.push("ip = ?");
+            params.push(ip);
+        }
+        if (loggedUser) {
+            updateQueryParts.push("loggedUser = ?");
+            params.push(loggedUser);
+        }
+        if(hardwareInfo) {
+            updateQueryParts.push("osName = ?, osVersion = ?, cpuModel = ?, cpuCores = ?, totalMemory = ?, disks = ?");
+            params.push(
+                hardwareInfo.osName || null,
+                hardwareInfo.osVersion || null,
+                hardwareInfo.cpuModel || null,
+                hardwareInfo.cpuCores || null,
+                hardwareInfo.totalMemory || null,
+                hardwareInfo.disks || null
+            );
+        }
+
+        if (updateQueryParts.length > 0) {
+            const updateQuery = `UPDATE pcs SET ${updateQueryParts.join(', ')} WHERE id = ?`;
+            params.push(pcId);
+            const pcStmt = db.prepare(updateQuery);
+            pcStmt.run(...params);
+        }
     }
-    
-    updateQuery += " WHERE id = ?";
-    params.push(pcId);
-    
-    const pcStmt = db.prepare(updateQuery);
-    pcStmt.run(...params);
+
 
     if(taskId) {
         let taskStatus = 'en_progreso';

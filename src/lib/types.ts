@@ -44,6 +44,7 @@ export type PackageType = 'actualizacion_archivos' | 'ejecutar_script' | 'comand
 export interface Package {
   id: number;
   name: string;
+  version: string | null;
   description: string | null;
   packageType: PackageType;
   updateFilePath: string | null; 
