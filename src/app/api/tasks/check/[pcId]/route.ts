@@ -35,6 +35,7 @@ export async function POST(
     const cancelledTask = checkCancelStmt.get(pcId) as { id: number } | undefined;
 
     if (cancelledTask) {
+        db.prepare("UPDATE tasks SET status = 'cancelado_confirmado' WHERE id = ?").run(cancelledTask.id);
         return NextResponse.json({ task: 'cancelar', taskId: cancelledTask.id });
     }
 

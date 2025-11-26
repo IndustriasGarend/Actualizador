@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import type { Package } from '@/lib/types';
 import { notFound } from 'next/navigation';
 
-function getPackage(id: string): Package | undefined {
+async function getPackage(id: string): Promise<Package | undefined> {
   if (id === 'nuevo') {
     return undefined;
   }
@@ -23,7 +23,7 @@ interface PackageDetailPageProps {
 }
 
 export default async function PackageDetailPage({ params }: PackageDetailPageProps) {
-  const pkg = getPackage(params.id);
+  const pkg = await getPackage(params.id);
 
   if (params.id !== 'nuevo' && !pkg) {
     notFound();
