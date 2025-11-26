@@ -26,11 +26,12 @@ export async function POST(
       return NextResponse.json({ task: 'actualizar_agente' });
     }
 
-    // 2. Verificación de tareas de cancelación
+    // 2. Verificación de tareas de cancelación pendientes
+    // Simplificamos la consulta para ser más robusta
     const checkCancelStmt = db.prepare(`
-        SELECT t.id FROM tasks t
-        JOIN pcs p ON p.id = t.pcId
-        WHERE t.pcId = ? AND p.currentTaskId = t.id AND t.status = 'cancelado'
+        SELECT id FROM tasks 
+        WHERE pcId = ? AND status = 'cancelado' 
+        ORDER BY updatedAt DESC LIMIT 1
     `);
     const cancelledTask = checkCancelStmt.get(pcId) as { id: number } | undefined;
 
