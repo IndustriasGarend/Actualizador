@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { z } from 'zod';
@@ -65,8 +66,7 @@ export async function PUT(
             packageType = ?,
             updateFilePath = ?, 
             localUpdateDir = ?, 
-            installDir = ?, 
-            serviceName = ?, 
+            installDir = ?,             serviceName = ?, 
             environmentPath = ?,
             command = ?,
             postInstallScript = ?
