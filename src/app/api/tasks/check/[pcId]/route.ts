@@ -39,7 +39,14 @@ export async function POST(
     }
 
     // 3. Búsqueda de tareas de actualización pendientes
-    const taskStmt = db.prepare("SELECT id, packageId FROM tasks WHERE pcId = ? AND status = 'pendiente' ORDER BY createdAt DESC LIMIT 1");
+    const taskStmt = db.prepare(`
+      SELECT t.id, t.packageId 
+      FROM tasks t
+      JOIN packages p ON p.id = t.packageId
+      WHERE t.pcId = ? AND t.status = 'pendiente' 
+      ORDER BY t.createdAt DESC 
+      LIMIT 1
+    `);
     const task = taskStmt.get(pcId) as { id: number; packageId: number } | undefined;
 
     if (task) {
@@ -47,7 +54,7 @@ export async function POST(
       const pkg = packageStmt.get(task.packageId) as Package | undefined;
       
       if (!pkg) {
-        // Marcar tarea como errónea si el paquete no existe
+        // Marcar tarea como errónea si el paquete no existe (aunque el JOIN ya debería prevenir esto)
         db.prepare("UPDATE tasks SET status = 'error' WHERE id = ?").run(task.id);
         return NextResponse.json({ task: 'ninguna' });
       }
