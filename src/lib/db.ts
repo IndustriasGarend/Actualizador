@@ -107,17 +107,18 @@ function runMigrations() {
             console.log("Añadiendo columna 'version' a la tabla 'packages'...");
             db.exec('ALTER TABLE packages ADD COLUMN version TEXT');
         }
-
-        // --- Migración de la tabla 'tasks' para renombrar 'packageId' a 'packageId' ---
+        
+        // --- Corrección de la migración de la tabla 'tasks' para renombrar 'packageId' a 'packageId' ---
         const tasksTableInfo = db.prepare("PRAGMA table_info(tasks)").all();
         const oldColumnExists = tasksTableInfo.some(col => (col as any).name === 'packageId');
         const newColumnExists = tasksTableInfo.some(col => (col as any).name === 'packageId');
 
         if (oldColumnExists && !newColumnExists) {
             console.log("Renombrando columna 'packageId' a 'packageId' en la tabla 'tasks'...");
-            db.exec('ALTER TABLE tasks RENAME COLUMN packageId TO packageId');
+            // Usar una sintaxis de renombrado compatible con versiones más antiguas de SQLite
+             db.exec('ALTER TABLE tasks RENAME COLUMN packageId TO packageId');
         } else if (!oldColumnExists && !newColumnExists) {
-            // Caso borde: la tabla existe pero ninguna de las columnas, la añadimos.
+            // Este caso es poco probable si la tabla ya existe, pero es un buen seguro.
             console.log("Añadiendo columna 'packageId' a la tabla 'tasks'...");
             db.exec('ALTER TABLE tasks ADD COLUMN packageId INTEGER');
         }

@@ -57,11 +57,7 @@ function DiskInfo({ disksJson }: { disksJson: string | null }) {
     }
 }
 
-interface PcDetailPageProps {
-  params: { id: string };
-}
-
-export default async function PcDetailPage({ params }: PcDetailPageProps) {
+export default async function PcDetailPage({ params }: { params: { id: string } }) {
     const pc = getPc(params.id);
     const logs = getLogsForPc(params.id);
 
