@@ -3,23 +3,58 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import type { SystemLogEntry, DateRange } from './types';
 
-
 // La base de datos ahora siempre será un archivo físico para consistencia entre desarrollo y producción.
 const dbPath = path.join(process.cwd(), 'softland-updater.db');
+export let db: Database.Database;
 
-export const db = new Database(dbPath);
+/**
+ * Representa una función de migración que recibe una instancia de la base de datos.
+ */
+type Migration = (db: Database.Database) => void;
 
-console.log(`Base de datos SQLite conectada en: ${dbPath}`);
+/**
+ * Array ordenado de funciones de migración.
+ * Cada índice + 1 corresponde a la versión de la base de datos a la que se migra.
+ * Ejemplo: MIGRATIONS[0] migra de la versión 0 a la 1.
+ */
+const MIGRATIONS: Migration[] = [
+    // Migración para la versión 1
+    (db) => {
+        console.log("Aplicando migración a v1...");
+        db.transaction(() => {
+            const tableInfo = (tableName: string) => db.prepare(`PRAGMA table_info(${tableName})`).all();
+            const columnExists = (tableName: string, columnName: string) => tableInfo(tableName).some(col => (col as any).name === columnName);
 
-function runMigrations() {
+            if (!columnExists('packages', 'postInstallScript')) {
+                console.log("MIGRATION (v1): Añadiendo columna 'postInstallScript' a la tabla 'packages'.");
+                db.exec('ALTER TABLE packages ADD COLUMN postInstallScript TEXT');
+            }
+            if (!columnExists('packages', 'version')) {
+                console.log("MIGRATION (v1): Añadiendo columna 'version' a la tabla 'packages'.");
+                db.exec('ALTER TABLE packages ADD COLUMN version TEXT');
+            }
+        })();
+    },
+    // NOTA: Futuras migraciones se añaden aquí.
+    // (db) => {
+    //     console.log("Aplicando migración a v2...");
+    //     db.exec('ALTER TABLE ...');
+    // },
+];
+
+/**
+ * Inicializa la base de datos con el esquema principal si no existe.
+ * @param db La instancia de la base de datos.
+ */
+function initializeDatabase(db: Database.Database) {
+    console.log("La base de datos no existe. Creando esquema inicial...");
+    db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA foreign_keys = ON;');
-    
+
     db.transaction(() => {
-        // Usar CREATE TABLE IF NOT EXISTS para que las migraciones sean idempotentes
-        
         // Tabla para almacenar la información de las PCs
         db.exec(`
-          CREATE TABLE IF NOT EXISTS pcs (
+          CREATE TABLE pcs (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             ip TEXT,
@@ -42,7 +77,7 @@ function runMigrations() {
 
         // Tabla para almacenar los paquetes de software
         db.exec(`
-            CREATE TABLE IF NOT EXISTS packages (
+            CREATE TABLE packages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 version TEXT,
@@ -60,11 +95,11 @@ function runMigrations() {
 
         // Tabla para almacenar las tareas de actualización
         db.exec(`
-          CREATE TABLE IF NOT EXISTS tasks (
+          CREATE TABLE tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pcId TEXT NOT NULL,
             packageId INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pendiente', -- pendiente, en_progreso, completado, error, cancelado
+            status TEXT NOT NULL DEFAULT 'pendiente',
             createdAt TEXT DEFAULT (datetime('now')),
             updatedAt TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (pcId) REFERENCES pcs(id) ON DELETE CASCADE,
@@ -74,13 +109,13 @@ function runMigrations() {
 
         // Tabla para almacenar los logs de cada paso de la actualización
         db.exec(`
-          CREATE TABLE IF NOT EXISTS logs (
+          CREATE TABLE logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pcId TEXT NOT NULL,
             pcName TEXT NOT NULL,
             timestamp TEXT DEFAULT (datetime('now')),
             action TEXT NOT NULL,
-            status TEXT NOT NULL, -- Éxito, Fallo, Omitido, Cancelado
+            status TEXT NOT NULL,
             message TEXT,
             versionId TEXT
           );
@@ -88,15 +123,15 @@ function runMigrations() {
 
         // Tabla para configuración general del sistema
         db.exec(`
-          CREATE TABLE IF NOT EXISTS settings (
+          CREATE TABLE settings (
             key TEXT PRIMARY KEY,
             value TEXT
           );
         `);
 
-        // NUEVA TABLA: Para logs del sistema (INFO, WARN, ERROR)
+        // Tabla para logs del sistema (INFO, WARN, ERROR)
         db.exec(`
-          CREATE TABLE IF NOT EXISTS system_logs (
+          CREATE TABLE system_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             type TEXT NOT NULL,
@@ -105,40 +140,63 @@ function runMigrations() {
           );
         `);
 
-
-        // --- Migraciones de Estructura ---
-        const tableInfo = (tableName: string) => db.prepare(`PRAGMA table_info(${tableName})`).all();
-        const columnExists = (tableName: string, columnName: string) => tableInfo(tableName).some(col => (col as any).name === columnName);
-
-        // Migración para 'packages'
-        if (!columnExists('packages', 'postInstallScript')) {
-            console.log("Añadiendo columna 'postInstallScript' a la tabla 'packages'...");
-            db.exec('ALTER TABLE packages ADD COLUMN postInstallScript TEXT');
-        }
-        if (!columnExists('packages', 'version')) {
-            console.log("Añadiendo columna 'version' a la tabla 'packages'...");
-            db.exec('ALTER TABLE packages ADD COLUMN version TEXT');
-        }
-
-        // Migración para 'tasks'
-        if (columnExists('tasks', 'packageId')) {
-             console.log("Renombrando columna 'packageId' a 'packageId' en la tabla 'tasks'...");
-             db.exec('ALTER TABLE tasks RENAME COLUMN packageId TO packageId');
-        } else if (!columnExists('tasks', 'packageId')) {
-             console.log("Añadiendo columna 'packageId' a la tabla 'tasks'...");
-             db.exec('ALTER TABLE tasks ADD COLUMN packageId INTEGER NOT NULL DEFAULT 0');
-        }
-
+        // Al final de la inicialización, la versión de la BD es 0. Las migraciones la subirán.
+        db.exec('PRAGMA user_version = 0');
     })();
-    console.log("Migraciones de base de datos verificadas/ejecutadas correctamente.");
+    console.log("Esquema inicial de base de datos creado.");
+}
+
+/**
+ * Ejecuta las migraciones pendientes en la base de datos.
+ * @param db La instancia de la base de datos.
+ */
+function runMigrations(db: Database.Database) {
+    const currentVersion = db.prepare('PRAGMA user_version').get() as { user_version: number };
+    let version = currentVersion.user_version;
+    
+    console.log(`Versión actual de la base de datos: ${version}`);
+
+    if (version < MIGRATIONS.length) {
+        db.transaction(() => {
+            for (let i = version; i < MIGRATIONS.length; i++) {
+                const newVersion = i + 1;
+                console.log(`Ejecutando migración para la versión ${newVersion}...`);
+                MIGRATIONS[i](db);
+                db.prepare(`PRAGMA user_version = ${newVersion}`).run();
+                console.log(`Base de datos migrada a la versión ${newVersion}.`);
+            }
+        })();
+    } else {
+        console.log("La base de datos ya está actualizada.");
+    }
+}
+
+/**
+ * Conecta a la base de datos, la crea si no existe y ejecuta las migraciones.
+ */
+function connectDatabase() {
+    const dbInstance = new Database(dbPath);
+    console.log(`Base de datos SQLite conectada en: ${dbPath}`);
+
+    // Verificar si la tabla de versiones existe para saber si es una BD nueva
+    const tableCheck = dbInstance.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'").get();
+    const isNewDb = !tableCheck;
+
+    if (isNewDb) {
+        initializeDatabase(dbInstance);
+    }
+    
+    runMigrations(dbInstance);
+    
+    db = dbInstance;
 }
 
 
-// Ejecutar las migraciones al iniciar la aplicación.
-// Esto asegura que la estructura de la base de datos esté siempre presente.
-runMigrations();
+// --- Lógica Principal: Conectar y preparar la base de datos al iniciar la aplicación ---
+connectDatabase();
 
-// --- NUEVAS FUNCIONES DE ACCESO A DATOS PARA SYSTEM_LOGS ---
+
+// --- Funciones de Acceso a Datos para SYSTEM_LOGS ---
 
 /**
  * Adds a new log entry to the system_logs table.
