@@ -27,7 +27,6 @@ export async function POST(
     }
 
     // 2. Verificación de tareas de cancelación pendientes
-    // Simplificamos la consulta para ser más robusta
     const checkCancelStmt = db.prepare(`
         SELECT id FROM tasks 
         WHERE pcId = ? AND status = 'cancelado' 
