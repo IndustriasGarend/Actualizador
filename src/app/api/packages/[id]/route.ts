@@ -21,7 +21,6 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  await request.text(); // Consume body to make params available
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) {
@@ -44,7 +43,6 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  await request.text(); // Consume body to make params available
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) {
@@ -108,7 +106,6 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  await request.text(); // Consume body to make params available
   try {
     const id = parseInt(params.id, 10);
      if (isNaN(id)) {

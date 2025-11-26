@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { LATEST_AGENT_VERSION } from '@/lib/data';
@@ -8,7 +9,6 @@ export async function POST(
   request: Request,
   { params }: { params: { pcId: string } }
 ) {
-  await request.text(); // Consume body to make params available
   const pcId = params.pcId;
   const { agentVersion, pcName } = await request.json();
 
@@ -28,13 +28,13 @@ export async function POST(
 
     // 2. Verificación de tareas de cancelación
     const checkCancelStmt = db.prepare(`
-        SELECT t.id, t.status FROM tasks t
+        SELECT t.id FROM tasks t
         JOIN pcs p ON p.id = t.pcId
         WHERE t.pcId = ? AND p.currentTaskId = t.id AND t.status = 'cancelado'
     `);
-    const cancelledTask = checkCancelStmt.get(pcId);
+    const cancelledTask = checkCancelStmt.get(pcId) as { id: number } | undefined;
 
-    if (cancelledTask) {
+    if (cancelledTask && cancelledTask.id) {
         return NextResponse.json({ task: 'cancelar', taskId: cancelledTask.id });
     }
 
