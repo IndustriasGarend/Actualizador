@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -9,6 +10,7 @@ import {
   Rocket,
   LifeBuoy,
   Package,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   SidebarContent,
@@ -26,7 +28,8 @@ export function MainSidebar() {
   const menuItems = [
     { href: '/', label: 'Panel', icon: Computer },
     { href: '/paquetes', label: 'Paquetes', icon: Package },
-    { href: '/historial', label: 'Historial', icon: History },
+    { href: '/historial', label: 'Historial Tareas', icon: History },
+    { href: '/visor-eventos', label: 'Visor de Eventos', icon: ShieldAlert },
     { href: '/configuracion', label: 'Configuración', icon: Settings },
   ];
 

@@ -59,3 +59,24 @@ export interface Package {
 export interface SystemConfig {
   serverUrl: string;
 }
+
+// --- NUEVOS TIPOS PARA VISOR DE EVENTOS ---
+
+/**
+* Represents a system log entry for auditing and debugging.
+*/
+export type SystemLogEntry = {
+    id: number;
+    timestamp: string;
+    type: "INFO" | "WARN" | "ERROR";
+    message: string;
+    details?: any; // Stored as a JSON string in the DB
+};
+
+/**
+ * Represents a date range for filtering.
+ */
+export type DateRange = {
+    from: Date | undefined;
+    to?: Date | undefined;
+};

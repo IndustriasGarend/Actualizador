@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { z } from 'zod';
+import { logInfo } from '@/lib/system-logger';
 
 const formSchema = z.object({
   serverUrl: z.string().url().optional().or(z.literal('')),
@@ -23,7 +24,6 @@ export async function POST(request: Request) {
     const saveConfig = db.transaction((cfg: typeof configToSave) => {
         // Guardar o actualizar la URL del servidor
         if (cfg.serverUrl !== undefined) {
-          const existing = db.prepare("SELECT value FROM settings WHERE key = 'serverUrl'").get();
           if (cfg.serverUrl) {
             stmt.run('serverUrl', cfg.serverUrl);
           } else {
@@ -34,6 +34,10 @@ export async function POST(request: Request) {
     });
 
     saveConfig(configToSave);
+    
+    // Log the action
+    await logInfo('Configuración del sistema guardada', { settings: configToSave });
+
 
     return NextResponse.json({ message: 'Configuración guardada correctamente' });
 
