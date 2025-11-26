@@ -6,6 +6,8 @@ import JSZip from 'jszip';
 import { db } from '@/lib/db';
 import { LATEST_AGENT_VERSION } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 function getCustomServerUrl(): string | null {
     try {
         const stmt = db.prepare("SELECT value FROM settings WHERE key = 'serverUrl'");
