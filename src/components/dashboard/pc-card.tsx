@@ -15,6 +15,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
+  DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,9 +40,6 @@ import type { PC, Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ClientFormattedDate } from '@/components/shared/client-formatted-date';
 import { LATEST_AGENT_VERSION } from '@/lib/data';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { useState } from 'react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 
 interface PcCardProps {
   pc: PC;
@@ -98,7 +97,6 @@ export function PcCard({
   onDeleteClick,
   onToggleStatus,
 }: PcCardProps) {
-  const [open, setOpen] = useState(false)
   const isAgentOutdated = pc.agentVersion && pc.agentVersion !== LATEST_AGENT_VERSION;
   const isDisabled = pc.status === 'En progreso' || pc.status === 'Deshabilitado';
 
@@ -167,38 +165,27 @@ export function PcCard({
         />
       </CardContent>
       <CardFooter>
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button className="w-full" disabled={isDisabled}>
-                    <PackageCheck className="mr-2 h-4 w-4" />
-                    Actualizar / Instalar
-                    <ChevronDown className="ml-auto h-4 w-4" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="p-0" align="start">
-                 <Command>
-                    <CommandInput placeholder="Buscar paquete..." />
-                    <CommandList>
-                        <CommandEmpty>No se encontraron paquetes.</CommandEmpty>
-                        <CommandGroup>
-                            {packages.map((pkg) => (
-                                <CommandItem
-                                    key={pkg.id}
-                                    value={pkg.name}
-                                    onSelect={() => {
-                                        onUpdateClick(pkg.id);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    <PackageCheck className="mr-2 h-4 w-4" />
-                                    {pkg.name}
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="w-full" disabled={isDisabled}>
+              <PackageCheck className="mr-2 h-4 w-4" />
+              Actualizar / Instalar
+              <ChevronDown className="ml-auto h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="start">
+            <DropdownMenuLabel>Seleccione un paquete</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              {packages.map((pkg) => (
+                <DropdownMenuItem key={pkg.id} onSelect={() => onUpdateClick(pkg.id)}>
+                  <PackageCheck className="mr-2 h-4 w-4" />
+                  <span>{pkg.name}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardFooter>
     </Card>
   );

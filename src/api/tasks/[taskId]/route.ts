@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
@@ -6,7 +7,6 @@ export async function DELETE(
   request: Request,
   { params }: { params: { taskId: string } }
 ) {
-  await request.text(); // Consume body to make params available
   const taskId = parseInt(params.taskId, 10);
   if (isNaN(taskId)) {
     return NextResponse.json({ message: 'ID de tarea inválido' }, { status: 400 });

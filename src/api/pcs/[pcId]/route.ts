@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { PC } from '@/lib/types';
@@ -7,7 +8,6 @@ export async function GET(
   request: Request,
   { params }: { params: { pcId: string } }
 ) {
-  await request.text(); // Consume body to make params available
   try {
     const stmt = db.prepare("SELECT * FROM pcs WHERE id = ?");
     const pc = stmt.get(params.pcId);
@@ -27,7 +27,6 @@ export async function PUT(
   request: Request,
   { params }: { params: { pcId: string } }
 ) {
-  await request.text(); // Consume body to make params available
   const pcId = params.pcId;
   if (!pcId) {
     return NextResponse.json({ message: 'ID de PC inválido' }, { status: 400 });
@@ -63,7 +62,6 @@ export async function DELETE(
   request: Request,
   { params }: { params: { pcId: string } }
 ) {
-  await request.text(); // Consume body to make params available
   const pcId = params.pcId;
   if (!pcId) {
     return NextResponse.json({ message: 'ID de PC inválido' }, { status: 400 });

@@ -8,7 +8,10 @@ export async function POST(request: Request) {
     const { pcId, pcName, action, status, message, versionId, taskId, agentVersion, ip, loggedUser, hardwareInfo } = await request.json();
 
     if (!pcId || !pcName || !action || !status) {
-      return NextResponse.json({ message: 'Faltan parámetros requeridos' }, { status: 400 });
+      return new NextResponse(
+        JSON.stringify({ message: 'Faltan parámetros requeridos' }),
+        { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+      );
     }
     
     // 1. Insertar el registro de log
@@ -95,9 +98,15 @@ export async function POST(request: Request) {
         }
     }
 
-    return NextResponse.json({ message: 'Log guardado correctamente' });
+    return new NextResponse(
+        JSON.stringify({ message: 'Log guardado correctamente' }),
+        { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+    );
   } catch (error) {
     console.error('Error al guardar el log:', error);
-    return NextResponse.json({ message: 'Error del servidor' }, { status: 500 });
+    return new NextResponse(
+        JSON.stringify({ message: 'Error del servidor' }),
+        { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+    );
   }
 }

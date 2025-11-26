@@ -8,6 +8,7 @@ export async function POST(
   request: Request,
   { params }: { params: { pcId: string } }
 ) {
+  await request.text(); // Consume body to make params available
   const pcId = params.pcId;
   const { agentVersion, pcName } = await request.json();
 
