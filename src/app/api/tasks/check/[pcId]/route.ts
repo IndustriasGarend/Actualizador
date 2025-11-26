@@ -7,9 +7,9 @@ import type { Package } from '@/lib/types';
 
 export async function POST(
   request: Request,
-  { params }: { params: { pcId: string } }
+  context: { params: { pcId: string } }
 ) {
-  const pcId = params.pcId;
+  const pcId = context.params.pcId;
   const { agentVersion, pcName } = await request.json();
 
   try {
@@ -34,7 +34,7 @@ export async function POST(
     `);
     const cancelledTask = checkCancelStmt.get(pcId) as { id: number } | undefined;
 
-    if (cancelledTask && cancelledTask.id) {
+    if (cancelledTask) {
         return NextResponse.json({ task: 'cancelar', taskId: cancelledTask.id });
     }
 

@@ -18,7 +18,11 @@ function getPackage(id: string): Package | undefined {
   }
 }
 
-export default async function PackageDetailPage({ params }: { params: { id: string } }) {
+interface PackageDetailPageProps {
+  params: { id: string };
+}
+
+export default async function PackageDetailPage({ params }: PackageDetailPageProps) {
   const pkg = getPackage(params.id);
 
   if (params.id !== 'nuevo' && !pkg) {

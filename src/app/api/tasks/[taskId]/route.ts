@@ -1,12 +1,13 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
 // DELETE /api/tasks/[taskId] - Cancela una tarea
 export async function DELETE(
   request: Request,
-  { params }: { params: { taskId: string } }
+  context: { params: { taskId: string } }
 ) {
-  const taskId = parseInt(params.taskId, 10);
+  const taskId = parseInt(context.params.taskId, 10);
   if (isNaN(taskId)) {
     return NextResponse.json({ message: 'ID de tarea inválido' }, { status: 400 });
   }
