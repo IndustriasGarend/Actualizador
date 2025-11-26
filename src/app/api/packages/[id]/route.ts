@@ -18,10 +18,10 @@ const packageSchema = z.object({
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(context.params.id, 10);
+    const id = parseInt(params.id, 10);
     if (isNaN(id)) {
         return NextResponse.json({ message: 'ID de paquete inválido. Debe ser un número.' }, { status: 400 });
     }
@@ -33,17 +33,17 @@ export async function GET(
     }
     return NextResponse.json(pkg);
   } catch (error) {
-    console.error(`Error al obtener el paquete ${context.params.id}:`, error);
+    console.error(`Error al obtener el paquete ${params.id}:`, error);
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 });
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(context.params.id, 10);
+    const id = parseInt(params.id, 10);
     if (isNaN(id)) {
         return NextResponse.json({ message: 'ID de paquete inválido. Debe ser un número.' }, { status: 400 });
     }
@@ -96,17 +96,17 @@ export async function PUT(
 
     return NextResponse.json(updatedPackage);
   } catch (error) {
-    console.error(`Error al actualizar el paquete ${context.params.id}:`, error);
+    console.error(`Error al actualizar el paquete ${params.id}:`, error);
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 });
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(context.params.id, 10);
+    const id = parseInt(params.id, 10);
     if (isNaN(id)) {
         return NextResponse.json({ message: 'ID de paquete inválido. Debe ser un número.' }, { status: 400 });
     }
@@ -120,7 +120,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Paquete eliminado correctamente' });
   } catch (error) {
-    console.error(`Error al eliminar el paquete ${context.params.id}:`, error);
+    console.error(`Error al eliminar el paquete ${params.id}:`, error);
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 });
   }
 }

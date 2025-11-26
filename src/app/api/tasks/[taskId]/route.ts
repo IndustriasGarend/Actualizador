@@ -4,10 +4,10 @@ import { db } from '@/lib/db';
 // DELETE /api/tasks/[taskId] - Cancela una tarea
 export async function DELETE(
   request: Request,
-  context: { params: { taskId: string } }
+  { params }: { params: { taskId: string } }
 ) {
   try {
-    const taskId = parseInt(context.params.taskId, 10);
+    const taskId = parseInt(params.taskId, 10);
     if (isNaN(taskId)) {
       return NextResponse.json({ message: 'ID de tarea inválido. Debe ser un número.' }, { status: 400 });
     }
@@ -25,7 +25,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Tarea cancelada correctamente' });
   } catch (error) {
-    console.error(`Error al cancelar la tarea ${context.params.taskId}:`, error);
+    console.error(`Error al cancelar la tarea ${params.taskId}:`, error);
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 });
   }
 }

@@ -5,18 +5,18 @@ import { PC } from '@/lib/types';
 // GET /api/pcs/[pcId] - Obtiene una PC específica
 export async function GET(
   request: Request,
-  context: { params: { pcId: string } }
+  { params }: { params: { pcId: string } }
 ) {
   try {
     const stmt = db.prepare("SELECT * FROM pcs WHERE id = ?");
-    const pc = stmt.get(context.params.pcId);
+    const pc = stmt.get(params.pcId);
 
     if (!pc) {
       return NextResponse.json({ message: 'La PC no se encontró' }, { status: 404 });
     }
     return NextResponse.json(pc);
   } catch (error) {
-    console.error(`Error al obtener la PC ${context.params.pcId}:`, error);
+    console.error(`Error al obtener la PC ${params.pcId}:`, error);
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 });
   }
 }
@@ -24,9 +24,9 @@ export async function GET(
 // PUT /api/pcs/[pcId] - Actualiza una PC
 export async function PUT(
   request: Request,
-  context: { params: { pcId: string } }
+  { params }: { params: { pcId: string } }
 ) {
-  const pcId = context.params.pcId;
+  const pcId = params.pcId;
   if (!pcId) {
     return NextResponse.json({ message: 'ID de PC inválido' }, { status: 400 });
   }
@@ -59,9 +59,9 @@ export async function PUT(
 // DELETE /api/pcs/[pcId] - Elimina una PC
 export async function DELETE(
   request: Request,
-  context: { params: { pcId: string } }
+  { params }: { params: { pcId: string } }
 ) {
-  const pcId = context.params.pcId;
+  const pcId = params.pcId;
   if (!pcId) {
     return NextResponse.json({ message: 'ID de PC inválido' }, { status: 400 });
   }

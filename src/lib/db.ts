@@ -107,27 +107,26 @@ function runMigrations() {
 
 
         // --- Migraciones de Estructura ---
-        const packagesTableInfo = db.prepare("PRAGMA table_info(packages)").all();
-        
-        const postInstallScriptExists = packagesTableInfo.some(col => (col as any).name === 'postInstallScript');
-        if (!postInstallScriptExists) {
+        const tableInfo = (tableName: string) => db.prepare(`PRAGMA table_info(${tableName})`).all();
+        const columnExists = (tableName: string, columnName: string) => tableInfo(tableName).some(col => (col as any).name === columnName);
+
+        // Migración para 'packages'
+        if (!columnExists('packages', 'postInstallScript')) {
             console.log("Añadiendo columna 'postInstallScript' a la tabla 'packages'...");
             db.exec('ALTER TABLE packages ADD COLUMN postInstallScript TEXT');
         }
-
-        const versionExists = packagesTableInfo.some(col => (col as any).name === 'version');
-        if (!versionExists) {
+        if (!columnExists('packages', 'version')) {
             console.log("Añadiendo columna 'version' a la tabla 'packages'...");
             db.exec('ALTER TABLE packages ADD COLUMN version TEXT');
         }
-        
-        // --- Corrección de la migración de la tabla 'tasks' para renombrar 'packageId' a 'packageId' ---
-        const tasksTableInfo = db.prepare("PRAGMA table_info(tasks)").all();
-        const oldColumnExists = tasksTableInfo.some(col => (col as any).name === 'packageId');
 
-        if (oldColumnExists) {
-            console.log("Renombrando columna 'packageId' a 'packageId' en la tabla 'tasks'...");
+        // Migración para 'tasks'
+        if (columnExists('tasks', 'packageId')) {
+             console.log("Renombrando columna 'packageId' a 'packageId' en la tabla 'tasks'...");
              db.exec('ALTER TABLE tasks RENAME COLUMN packageId TO packageId');
+        } else if (!columnExists('tasks', 'packageId')) {
+             console.log("Añadiendo columna 'packageId' a la tabla 'tasks'...");
+             db.exec('ALTER TABLE tasks ADD COLUMN packageId INTEGER NOT NULL DEFAULT 0');
         }
 
     })();

@@ -6,9 +6,9 @@ import type { Package } from '@/lib/types';
 
 export async function POST(
   request: Request,
-  context: { params: { pcId: string } }
+  { params }: { params: { pcId: string } }
 ) {
-  const pcId = context.params.pcId;
+  const pcId = params.pcId;
   const { agentVersion, pcName } = await request.json();
 
   try {
