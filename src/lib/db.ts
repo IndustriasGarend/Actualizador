@@ -116,7 +116,7 @@ function runMigrations() {
         if (oldColumnExists && !newColumnExists) {
             console.log("Renombrando columna 'packageId' a 'packageId' en la tabla 'tasks'...");
             db.exec('ALTER TABLE tasks RENAME COLUMN packageId TO packageId');
-        } else if (!newColumnExists) {
+        } else if (!oldColumnExists && !newColumnExists) {
             // Caso borde: la tabla existe pero ninguna de las columnas, la añadimos.
             console.log("Añadiendo columna 'packageId' a la tabla 'tasks'...");
             db.exec('ALTER TABLE tasks ADD COLUMN packageId INTEGER');

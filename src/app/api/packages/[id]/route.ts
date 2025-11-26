@@ -23,7 +23,7 @@ export async function GET(
   try {
     const id = parseInt(context.params.id, 10);
     if (isNaN(id)) {
-        return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
+        return NextResponse.json({ message: 'ID de paquete inválido. Debe ser un número.' }, { status: 400 });
     }
     const stmt = db.prepare("SELECT * FROM packages WHERE id = ?");
     const pkg = stmt.get(id);
@@ -45,7 +45,7 @@ export async function PUT(
   try {
     const id = parseInt(context.params.id, 10);
     if (isNaN(id)) {
-        return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
+        return NextResponse.json({ message: 'ID de paquete inválido. Debe ser un número.' }, { status: 400 });
     }
 
     const body = await request.json();
@@ -88,7 +88,7 @@ export async function PUT(
     );
 
     if (result.changes === 0) {
-      return NextResponse.json({ message: 'El paquete no se encontró' }, { status: 404 });
+      return NextResponse.json({ message: 'El paquete no se encontró para actualizar' }, { status: 404 });
     }
 
     const updatedPackageStmt = db.prepare("SELECT * FROM packages WHERE id = ?");
@@ -107,15 +107,15 @@ export async function DELETE(
 ) {
   try {
     const id = parseInt(context.params.id, 10);
-     if (isNaN(id)) {
-        return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
+    if (isNaN(id)) {
+        return NextResponse.json({ message: 'ID de paquete inválido. Debe ser un número.' }, { status: 400 });
     }
 
     const stmt = db.prepare("DELETE FROM packages WHERE id = ?");
     const result = stmt.run(id);
 
     if (result.changes === 0) {
-      return NextResponse.json({ message: 'El paquete no se encontró' }, { status: 404 });
+      return NextResponse.json({ message: 'El paquete no se encontró para eliminar' }, { status: 404 });
     }
 
     return NextResponse.json({ message: 'Paquete eliminado correctamente' });
