@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         pcFinalStatus = 'Cancelado';
     }
     
-    // 3. Construir la consulta de actualización para la PC
+    // 3. Construir la consulta de actualización para la PC de forma dinámica
     const updateQueryParts: string[] = [];
     const params: (string | number | null)[] = [];
 
@@ -85,7 +85,6 @@ export async function POST(request: Request) {
         switch(pcFinalStatus) {
             case 'Actualizado': taskStatus = 'completado'; break;
             case 'Error': taskStatus = 'error'; break;
-
             case 'Cancelado': taskStatus = 'cancelado'; break;
             default: taskStatus = 'en_progreso'; break; // No debería ocurrir, pero como fallback
         }
